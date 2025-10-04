@@ -136,6 +136,10 @@ class WindowManager:
         # Scrollbar styles
         style.configure('TScrollbar', background=colors['border_color'])
         
+        # PanedWindow styles
+        style.configure('TPanedwindow', background=colors['bg_color'])
+        style.configure('TPanedwindow.Sash', background=colors['border_color'], relief='flat')
+        
         # Radiobutton and Checkbutton styles
         style.configure('TRadiobutton', background=colors['card_bg'], foreground=colors['text_color'])
         style.configure('TCheckbutton', background=colors['card_bg'], foreground=colors['text_color'])
