@@ -55,18 +55,21 @@ class MediaConverterOrganizerGUI:
         # Create sidebar
         self.sidebar = self.nav_manager.create_sidebar()
         
-        # Create a right container that holds the content area and the logs panel
-        self.right_container = ttk.Frame(self.main_container, style='Content.TFrame')
-        self.right_container.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        # Create a paned window for resizable content and logs panels
+        # Users can drag the sash (divider) to resize the Activity Log panel
+        self.paned_window = ttk.PanedWindow(self.main_container, orient=tk.HORIZONTAL)
+        self.paned_window.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-        # Content area (left side of right container)
-        self.content_area = ttk.Frame(self.right_container, style='Content.TFrame')
-        self.content_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Content area (left side of paned window)
+        self.content_area = ttk.Frame(self.paned_window, style='Content.TFrame')
+        self.paned_window.add(self.content_area, weight=2)  # Give it more weight initially
         
-        # Persistent logs panel on the right
-        self.logs_panel = ttk.Frame(self.right_container, style='Content.TFrame', width=420)
-        self.logs_panel.pack(side=tk.RIGHT, fill=tk.Y)
-        self.logs_panel.pack_propagate(False)
+        # Persistent logs panel on the right (resizable)
+        self.logs_panel = ttk.Frame(self.paned_window, style='Content.TFrame')
+        self.paned_window.add(self.logs_panel, weight=1)  # Give it less weight initially
+        
+        # Configure the paned window after adding all panes
+        self.configure_paned_window()
         
         # Logs title
         logs_title = ttk.Label(self.logs_panel, text="📝 Activity Logs", style='Title.TLabel')
@@ -77,8 +80,6 @@ class MediaConverterOrganizerGUI:
         self.side_log_text = scrolledtext.ScrolledText(
             self.logs_panel,
             wrap=tk.WORD,
-            width=48,
-            height=25,
             font=('Consolas', 10),
             bg='white',
             fg='#212529',
@@ -93,6 +94,25 @@ class MediaConverterOrganizerGUI:
         
         # Update navigation manager with content area
         self.nav_manager.content_area = self.content_area
+    
+    def configure_paned_window(self):
+        """Configure the paned window settings"""
+        # Set initial sash position (approximately 2/3 for content, 1/3 for logs)
+        # This will be calculated based on the window width
+        self.root.after(100, self._set_initial_sash_position)
+    
+    def _set_initial_sash_position(self):
+        """Set the initial sash position after the window is fully rendered"""
+        try:
+            # Get the current width of the paned window
+            paned_width = self.paned_window.winfo_width()
+            if paned_width > 100:  # Make sure the window is rendered
+                # Set sash to approximately 2/3 of the width
+                initial_position = int(paned_width * 0.67)
+                self.paned_window.sash_place(0, initial_position, 0)
+        except tk.TclError:
+            # If there's an error, try again later
+            self.root.after(100, self._set_initial_sash_position)
     
     def setup_pages(self):
         """Setup all application pages"""

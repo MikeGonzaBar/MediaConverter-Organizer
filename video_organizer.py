@@ -412,6 +412,203 @@ def scan_and_organize_videos(source_dir, move_files=False, dry_run=False):
         print()
         print("✓ All videos are already in the correct organized structure!")
 
+class VideoOrganizer:
+    """Class wrapper for video organization functionality"""
+    
+    def __init__(self, directory, mode="check", log_callback=None):
+        """
+        Initialize the VideoOrganizer
+        
+        Args:
+            directory (str): Path to the directory containing videos to organize
+            mode (str): Operation mode - "check", "dry_run", or "move"
+            log_callback (callable): Optional callback function for logging (func(message, level))
+        """
+        self.directory = Path(directory)
+        self.mode = mode
+        self.log_callback = log_callback or self._default_log
+    
+    def _default_log(self, message, level="INFO"):
+        """Default logging function that prints to console"""
+        print(f"[{level}] {message}")
+    
+    def organize_videos(self):
+        """Organize videos based on the specified mode"""
+        if not self.directory.exists():
+            raise FileNotFoundError(f"Directory '{self.directory}' does not exist.")
+        
+        if not self.directory.is_dir():
+            raise NotADirectoryError(f"'{self.directory}' is not a directory.")
+        
+        if self.mode == "check":
+            # For check mode, only show what would be organized
+            self._scan_and_organize_videos_with_logging(move_files=False, dry_run=False)
+        elif self.mode == "dry_run":
+            # For dry run mode, show detailed information without moving
+            self._scan_and_organize_videos_with_logging(move_files=True, dry_run=True)
+        elif self.mode == "move":
+            # For move mode, actually organize the files
+            self._scan_and_organize_videos_with_logging(move_files=True, dry_run=False)
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}. Must be 'check', 'dry_run', or 'move'.")
+    
+    def _scan_and_organize_videos_with_logging(self, move_files=False, dry_run=False):
+        """
+        Scan the source directory recursively for videos and organize them with logging.
+        
+        Args:
+            move_files (bool): If True, actually move the files to organized locations
+            dry_run (bool): If True, only print what would be done without actually moving
+        """
+        self.log_callback(f"Scanning directory: {self.directory}", "INFO")
+        if move_files:
+            if dry_run:
+                self.log_callback("Mode: DRY RUN - Will show what would be moved without actually moving files", "INFO")
+            else:
+                self.log_callback("Mode: MOVE FILES - Will actually move files to organized locations", "INFO")
+        else:
+            self.log_callback("Mode: CHECK ONLY - Will only show what needs to be organized", "INFO")
+        self.log_callback("=" * 60, "INFO")
+        
+        video_count = 0
+        unorganized_files = []
+        metadata_count = 0
+        no_metadata_count = 0
+        
+        # Recursively scan for videos
+        self.log_callback("Scanning for videos... (Press Ctrl+C to stop)", "INFO")
+        scanned_files = 0
+        
+        for file_path in self.directory.rglob('*'):
+            scanned_files += 1
+            
+            # Show progress every 100 files
+            if scanned_files % 100 == 0:
+                self.log_callback(f"  Scanned {scanned_files} files, found {video_count} videos...", "INFO")
+            
+            if file_path.is_file() and is_video_file(file_path):
+                video_count += 1
+                
+                # Check if video has metadata
+                metadata = get_video_metadata(file_path)
+                
+                if metadata and 'creation_date' in metadata:
+                    metadata_count += 1
+                    date_source = "Metadata"
+                    
+                    # Check if the file is already organized
+                    if not is_already_organized(file_path, self.directory):
+                        # Get the expected organized path
+                        expected_path = get_expected_path(file_path, self.directory)
+                        file_date = get_file_date(file_path)
+                        
+                        unorganized_files.append({
+                            'source': file_path,
+                            'target': expected_path,
+                            'date': file_date,
+                            'date_source': date_source,
+                            'metadata': metadata
+                        })
+                else:
+                    no_metadata_count += 1
+                    # Skip files without metadata - don't add to unorganized_files
+        
+        self.log_callback(f"Found {video_count} video files", "INFO")
+        self.log_callback(f"  - {metadata_count} with metadata creation dates", "INFO")
+        self.log_callback(f"  - {no_metadata_count} without metadata (skipped)", "INFO")
+        self.log_callback("=" * 60, "INFO")
+        
+        if video_count == 0:
+            self.log_callback("No video files found in the specified directory.", "INFO")
+            return
+        
+        # Print unorganized files
+        if unorganized_files:
+            self.log_callback(f"UNORGANIZED VIDEOS:", "INFO")
+            self.log_callback("=" * 60, "INFO")
+            
+            # Group by year and month
+            organized_by_date = {}
+            for file_info in unorganized_files:
+                year = file_info['date'].year
+                month = file_info['date'].month
+                key = (year, month)
+                
+                if key not in organized_by_date:
+                    organized_by_date[key] = []
+                organized_by_date[key].append(file_info)
+            
+            moved_count = 0
+            failed_count = 0
+            
+            for (year, month) in sorted(organized_by_date.keys()):
+                month_name = get_month_name(month)
+                self.log_callback(f"\n{year}", "INFO")
+                self.log_callback(f"  {month:02d}-{month_name}/", "INFO")
+                
+                for file_info in organized_by_date[(year, month)]:
+                    source = file_info['source']
+                    target = file_info['target']
+                    date = file_info['date']
+                    date_source = file_info['date_source']
+                    metadata = file_info['metadata']
+                    
+                    if not move_files:
+                        # Just print the information
+                        self.log_callback(f"    {source.name}", "INFO")
+                        self.log_callback(f"      From: {source}", "INFO")
+                        self.log_callback(f"      To:   {target}", "INFO")
+                        self.log_callback(f"      Date: {date.strftime('%Y-%m-%d %H:%M:%S')} ({date_source})", "INFO")
+                        
+                        # Print additional metadata if available
+                        if metadata:
+                            if 'duration' in metadata:
+                                duration_min = metadata['duration'] / 60
+                                self.log_callback(f"      Duration: {duration_min:.1f} minutes", "INFO")
+                            if 'size' in metadata:
+                                size_mb = metadata['size'] / (1024 * 1024)
+                                self.log_callback(f"      Size: {size_mb:.1f} MB", "INFO")
+                        
+                        self.log_callback("", "INFO")
+                    else:
+                        # Move the file
+                        if move_video_file(file_info, dry_run):
+                            moved_count += 1
+                        else:
+                            failed_count += 1
+            
+            self.log_callback("=" * 60, "INFO")
+            self.log_callback(f"SUMMARY:", "INFO")
+            self.log_callback(f"  Total videos found: {video_count}", "INFO")
+            self.log_callback(f"  Videos with metadata: {metadata_count}", "INFO")
+            self.log_callback(f"  Videos without metadata (skipped): {no_metadata_count}", "INFO")
+            self.log_callback(f"  Unorganized videos: {len(unorganized_files)}", "INFO")
+            
+            if move_files:
+                if dry_run:
+                    self.log_callback(f"  Files that would be moved: {moved_count}", "INFO")
+                    self.log_callback(f"  Files that would fail: {failed_count}", "INFO")
+                else:
+                    self.log_callback(f"  Files successfully moved: {moved_count}", "INFO")
+                    self.log_callback(f"  Files that failed to move: {failed_count}", "INFO")
+            
+            if not move_files:
+                self.log_callback("", "INFO")
+                self.log_callback("These videos need to be moved to their proper organized locations.", "INFO")
+                self.log_callback("Use 'move' mode to actually move the files, or 'dry_run' mode to see what would be moved.", "INFO")
+            
+        else:
+            self.log_callback("All videos are already properly organized!", "INFO")
+            self.log_callback("=" * 60, "INFO")
+            self.log_callback(f"SUMMARY:", "INFO")
+            self.log_callback(f"  Total videos found: {video_count}", "INFO")
+            self.log_callback(f"  Videos with metadata: {metadata_count}", "INFO")
+            self.log_callback(f"  Videos without metadata (skipped): {no_metadata_count}", "INFO")
+            self.log_callback(f"  Unorganized videos: 0", "INFO")
+            self.log_callback("", "INFO")
+            self.log_callback("✓ All videos are already in the correct organized structure!", "SUCCESS")
+
+
 def main():
     """Main function to handle command line arguments and execute the script."""
     parser = argparse.ArgumentParser(

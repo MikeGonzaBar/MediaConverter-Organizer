@@ -165,11 +165,11 @@ class MediaOrganizerPage:
                 from video_organizer import VideoOrganizer
                 
                 # Check images
-                img_organizer = ImageOrganizer(directory, mode="check")
+                img_organizer = ImageOrganizer(directory, mode="check", log_callback=self.log_callback)
                 img_organizer.organize_images()
                 
                 # Check videos
-                vid_organizer = VideoOrganizer(directory, mode="check")
+                vid_organizer = VideoOrganizer(directory, mode="check", log_callback=self.log_callback)
                 vid_organizer.organize_videos()
                 
             elif mode == "dry_run":
@@ -177,11 +177,11 @@ class MediaOrganizerPage:
                 from video_organizer import VideoOrganizer
                 
                 # Dry run images
-                img_organizer = ImageOrganizer(directory, mode="dry_run")
+                img_organizer = ImageOrganizer(directory, mode="dry_run", log_callback=self.log_callback)
                 img_organizer.organize_images()
                 
                 # Dry run videos
-                vid_organizer = VideoOrganizer(directory, mode="dry_run")
+                vid_organizer = VideoOrganizer(directory, mode="dry_run", log_callback=self.log_callback)
                 vid_organizer.organize_videos()
                 
             elif mode == "move":
@@ -189,11 +189,11 @@ class MediaOrganizerPage:
                 from video_organizer import VideoOrganizer
                 
                 # Actually organize images
-                img_organizer = ImageOrganizer(directory, mode="move")
+                img_organizer = ImageOrganizer(directory, mode="move", log_callback=self.log_callback)
                 img_organizer.organize_images()
                 
                 # Actually organize videos
-                vid_organizer = VideoOrganizer(directory, mode="move")
+                vid_organizer = VideoOrganizer(directory, mode="move", log_callback=self.log_callback)
                 vid_organizer.organize_videos()
             
             self.log_callback("Media organization completed successfully", "SUCCESS")

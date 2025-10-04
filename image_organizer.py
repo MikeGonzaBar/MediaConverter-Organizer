@@ -403,6 +403,199 @@ def scan_and_organize_images(source_dir):
     print("\n✓ Images with date information have been automatically organized!")
     print("⚠ Images without any date information remain in their original location for manual review.")
 
+class ImageOrganizer:
+    """Class wrapper for image organization functionality"""
+    
+    def __init__(self, directory, mode="check", log_callback=None):
+        """
+        Initialize the ImageOrganizer
+        
+        Args:
+            directory (str): Path to the directory containing images to organize
+            mode (str): Operation mode - "check", "dry_run", or "move"
+            log_callback (callable): Optional callback function for logging (func(message, level))
+        """
+        self.directory = Path(directory)
+        self.mode = mode
+        self.log_callback = log_callback or self._default_log
+    
+    def _default_log(self, message, level="INFO"):
+        """Default logging function that prints to console"""
+        print(f"[{level}] {message}")
+    
+    def organize_images(self):
+        """Organize images based on the specified mode"""
+        if not self.directory.exists():
+            raise FileNotFoundError(f"Directory '{self.directory}' does not exist.")
+        
+        if not self.directory.is_dir():
+            raise NotADirectoryError(f"'{self.directory}' is not a directory.")
+        
+        if self.mode == "check":
+            # For check mode, we'll modify the function to not actually move files
+            # but still show what would be organized
+            self._scan_and_organize_images_check_mode()
+        elif self.mode == "dry_run":
+            # For dry run mode, show detailed information without moving
+            self._scan_and_organize_images_dry_run()
+        elif self.mode == "move":
+            # For move mode, actually organize the files
+            scan_and_organize_images(self.directory)
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}. Must be 'check', 'dry_run', or 'move'.")
+    
+    def _scan_and_organize_images_check_mode(self):
+        """Check mode - only analyze and show what would be organized"""
+        self.log_callback(f"Scanning directory: {self.directory}", "INFO")
+        self.log_callback("=" * 50, "INFO")
+        self.log_callback("MODE: CHECK ONLY - No files will be moved", "INFO")
+        self.log_callback("=" * 50, "INFO")
+        
+        # Use the existing scan function but modify it to not move files
+        # We'll create a modified version that only shows what would be organized
+        self._scan_images_for_analysis()
+    
+    def _scan_and_organize_images_dry_run(self):
+        """Dry run mode - show detailed information without moving files"""
+        self.log_callback(f"Scanning directory: {self.directory}", "INFO")
+        self.log_callback("=" * 50, "INFO")
+        self.log_callback("MODE: DRY RUN - No files will be moved", "INFO")
+        self.log_callback("=" * 50, "INFO")
+        
+        # Use the existing scan function but modify it to not move files
+        self._scan_images_for_analysis()
+    
+    def _scan_images_for_analysis(self):
+        """Scan images and show what would be organized without actually moving them"""
+        image_count = 0
+        organized_files = {}
+        exif_count = 0
+        no_exif_count = 0
+        manual_review_files = []
+        
+        # Recursively scan for images
+        self.log_callback("Scanning for images... (Press Ctrl+C to stop)", "INFO")
+        scanned_files = 0
+        
+        for file_path in self.directory.rglob('*'):
+            scanned_files += 1
+            
+            # Show progress every 100 files
+            if scanned_files % 100 == 0:
+                self.log_callback(f"  Scanned {scanned_files} files, found {image_count} images...", "INFO")
+            
+            if file_path.is_file() and is_image_file(file_path):
+                image_count += 1
+                
+                # Get the best available date (EXIF first, then earliest filesystem date)
+                file_date = get_file_date(file_path)
+                
+                if file_date:
+                    # Check if we got EXIF date or filesystem date
+                    exif_date = get_exif_date(file_path)
+                    if exif_date:
+                        # Image has EXIF data
+                        exif_count += 1
+                        date_source = "EXIF"
+                    else:
+                        # Using filesystem date
+                        no_exif_count += 1
+                        date_source = "Filesystem"
+                    
+                    year = file_date.year
+                    month = file_date.month
+                    
+                    # Create target directory structure
+                    month_name = get_month_name(month)
+                    target_dir = self.directory / str(year) / f"{month:02d}-{month_name}"
+                    
+                    # Create target file path
+                    target_file = target_dir / file_path.name
+                    
+                    # Check if file is already in the correct location
+                    if file_path == target_file:
+                        # File is already in the correct location - skip it
+                        continue
+                    
+                    # Store organization info for files that need to be moved
+                    if (year, month) not in organized_files:
+                        organized_files[(year, month)] = []
+                    
+                    organized_files[(year, month)].append({
+                        'source': file_path,
+                        'target': target_file,
+                        'date': file_date,
+                        'date_source': date_source
+                    })
+                else:
+                    # No date available - flag for manual review
+                    no_exif_count += 1
+                    manual_review_files.append(file_path)
+        
+        self.log_callback(f"Found {image_count} image files", "INFO")
+        self.log_callback(f"  - {exif_count} with EXIF capture dates", "INFO")
+        self.log_callback(f"  - {no_exif_count} using filesystem dates", "INFO")
+        self.log_callback("=" * 50, "INFO")
+        
+        if image_count == 0:
+            self.log_callback("No image files found in the specified directory.", "INFO")
+            return
+        
+        # Count files that need to be moved
+        files_to_move = sum(len(files) for files in organized_files.values())
+        
+        # Show what would be organized
+        if organized_files:
+            self.log_callback(f"IMAGES THAT WOULD BE ORGANIZED:", "INFO")
+            self.log_callback("=" * 50, "INFO")
+            
+            for (year, month) in sorted(organized_files.keys()):
+                month_name = get_month_name(month)
+                self.log_callback(f"\n{year}", "INFO")
+                self.log_callback(f"  {month:02d}-{month_name}/", "INFO")
+                
+                for file_info in organized_files[(year, month)]:
+                    source = file_info['source']
+                    target = file_info['target']
+                    date = file_info['date']
+                    
+                    self.log_callback(f"    {source.name}", "INFO")
+                    self.log_callback(f"      From: {source}", "INFO")
+                    self.log_callback(f"      To:   {target}", "INFO")
+                    self.log_callback(f"      Date: {date.strftime('%Y-%m-%d %H:%M:%S')} ({file_info['date_source']})", "INFO")
+                    self.log_callback("", "INFO")
+            
+            self.log_callback("=" * 50, "INFO")
+            self.log_callback(f"ANALYSIS SUMMARY:", "INFO")
+            self.log_callback(f"  Files that would be moved: {files_to_move}", "INFO")
+            self.log_callback("=" * 50, "INFO")
+        else:
+            self.log_callback("All images are already in the correct location!", "INFO")
+        
+        # Print manual review list
+        if manual_review_files:
+            self.log_callback("=" * 50, "INFO")
+            self.log_callback("MANUAL REVIEW REQUIRED (Images without any date information):", "INFO")
+            self.log_callback("=" * 50, "INFO")
+            self.log_callback("The following images have no date information and need manual review:", "INFO")
+            self.log_callback("", "INFO")
+            
+            for file_path in sorted(manual_review_files):
+                self.log_callback(f"  {file_path}", "INFO")
+            
+            self.log_callback("", "INFO")
+            self.log_callback("These files will remain in their current location.", "INFO")
+        
+        self.log_callback("=" * 50, "INFO")
+        self.log_callback(f"FINAL SUMMARY:", "INFO")
+        self.log_callback(f"  Total images found: {image_count}", "INFO")
+        self.log_callback(f"  Images with EXIF data: {exif_count}", "INFO")
+        self.log_callback(f"  Images using filesystem dates: {no_exif_count}", "INFO")
+        self.log_callback(f"  Images that would be moved: {files_to_move}", "INFO")
+        self.log_callback(f"  Images needing manual review: {len(manual_review_files)}", "INFO")
+        self.log_callback("\n✓ Analysis complete! Use 'move' mode to actually organize the files.", "SUCCESS")
+
+
 def main():
     """Main function to handle command line arguments and execute the script."""
     parser = argparse.ArgumentParser(
