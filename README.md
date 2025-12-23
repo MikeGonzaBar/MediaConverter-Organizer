@@ -15,7 +15,27 @@ This project provides:
 
 ## 🚀 Quick Start
 
-### 🖥️ Windows
+### 🌍 Cross-Platform Launcher (Recommended)
+
+**Works on Windows, Linux, and macOS!**
+
+1. **Run the unified launcher**:
+
+   ```bash
+   python run_gui.py
+   ```
+
+   The launcher will:
+   - Check Python version
+   - Create virtual environment if needed
+   - Install dependencies automatically
+   - Check for external tools (FFmpeg, Chromaprint)
+   - Provide platform-specific installation instructions if needed
+   - Launch the GUI
+
+### 🖥️ Platform-Specific Launchers
+
+#### Windows
 
 1. **Run the setup script**:
 
@@ -27,9 +47,17 @@ This project provides:
 
    ```cmd
    run_gui.bat
-   ```pip
+   ```
 
-### 🐧 Linux/macOS
+   Or use the cross-platform launcher:
+
+   ```cmd
+   python scripts\run_gui.py
+   # or
+   python main.py
+   ```
+
+#### 🐧 Linux/macOS
 
 1. **Run the setup script**:
 
@@ -42,6 +70,14 @@ This project provides:
 
    ```bash
    ./run_gui.sh
+   ```
+
+   Or use the cross-platform launcher:
+
+   ```bash
+   python3 scripts/run_gui.py
+   # or
+   python3 main.py
    ```
 
 ### 🐍 Manual Setup
@@ -65,19 +101,31 @@ python media_converter_organizer_gui.py
 
 ## 📋 Prerequisites
 
+### Required
+
 - **Python 3.7+** (Python 3.9+ recommended)
 - **FFmpeg** (for video metadata and audio processing)
+- **tkinter** (usually included with Python, but may need separate install on Linux)
+
+### Optional
+
+- **Chromaprint (fpcalc)** (for audio fingerprinting)
 - **Internet connection** (for metadata lookup and fingerprinting)
 - **AcoustID API Key** (optional, for audio fingerprinting)
+- **Last.fm API Key** (optional, for enhanced metadata)
 
 ## 🛠️ Installation
 
-### FFmpeg Installation
+### External Dependencies Installation
+
+#### FFmpeg (Required)
 
 **Windows:**
 
 ```bash
 winget install ffmpeg
+# Or download from: https://ffmpeg.org/download.html
+# Add to PATH after installation
 ```
 
 **macOS:**
@@ -86,18 +134,64 @@ winget install ffmpeg
 brew install ffmpeg
 ```
 
-**Linux (Ubuntu/Debian):**
+**Linux:**
 
 ```bash
+# Ubuntu/Debian
 sudo apt install ffmpeg
+
+# Fedora
+sudo dnf install ffmpeg
+
+# Arch Linux
+sudo pacman -S ffmpeg
 ```
 
-**Linux (CentOS/RHEL/Fedora):**
+#### Chromaprint (Optional - for audio fingerprinting)
+
+**Windows:**
+
+- Download from: <https://acoustid.org/chromaprint>
+- Extract and add `fpcalc.exe` to PATH
+
+**macOS:**
 
 ```bash
-sudo yum install ffmpeg  # CentOS/RHEL
-sudo dnf install ffmpeg  # Fedora
+brew install chromaprint
 ```
+
+**Linux:**
+
+```bash
+# Ubuntu/Debian
+sudo apt install chromaprint-tools
+
+# Fedora
+sudo dnf install chromaprint-tools
+
+# Arch Linux
+sudo pacman -S chromaprint
+```
+
+#### tkinter (Required for GUI - usually included)
+
+**Linux (if missing):**
+
+```bash
+# Ubuntu/Debian
+sudo apt install python3-tk
+
+# Fedora
+sudo dnf install python3-tkinter
+
+# Arch Linux
+sudo pacman -S tk
+```
+
+**Windows/macOS:**
+
+- Usually included with Python installation
+- If missing, reinstall Python from [python.org](https://python.org)
 
 ### API Keys (Optional)
 
@@ -120,22 +214,30 @@ LASTFM_API_SECRET=your_lastfm_secret_here
 MediaConverter-Organizer/
 ├── 📄 README.md                          # This file
 ├── 📄 requirements.txt                   # All dependencies
-├── 🖥️ media_converter_organizer_gui.py   # Main GUI application
-├── ⚙️ setup.bat / setup.sh               # Setup scripts
-├── 🚀 run_gui.bat / run_gui.sh           # GUI launcher scripts
-├── 🚀 run_gui_simple.bat                 # Simple GUI launcher (Windows)
-├── 🛠️ fix_venv.bat                       # Virtual environment fix script
-├── 🧹 cleanup_venv.ps1                   # PowerShell cleanup script
-├── 🖼️ image_organizer.py                 # Image organization tool
-├── 🎬 video_organizer.py                 # Video organization tool
-├── 🎵 wav_to_flac_converter.py           # WAV to FLAC converter
-├── 🔄 media_converter.py                 # Universal media converter
-├── 🖥️ media_converter_page.py            # Media converter GUI page
-├── 🎨 gui_utils.py                       # GUI utilities and styling
-├── 🧩 ui_components.py                   # Reusable UI components
-├── ⚙️ convert_wav_to_flac.bat            # Windows batch converter
-├── 📄 LASTFM_SETUP.md                    # Last.fm API setup guide
-└── 📄 LICENSE                            # Project license
+├── 📄 LICENSE                            # Project license
+├── 🚀 main.py                            # Main entry point
+├── 📁 src/                               # Source code
+│   ├── __init__.py                       # Package initialization
+│   ├── 🖥️ media_converter_organizer_gui.py   # Main GUI application
+│   ├── 🖥️ media_converter_page.py            # Media converter GUI page
+│   ├── 🎨 gui_utils.py                       # GUI utilities and styling
+│   ├── 🧩 ui_components.py                   # Reusable UI components
+│   ├── 🔄 media_converter.py                 # Universal media converter
+│   ├── 🖼️ image_organizer.py                 # Image organization tool
+│   ├── 🎬 video_organizer.py                 # Video organization tool
+│   ├── 🎵 wav_to_flac_converter.py           # WAV to FLAC converter
+│   └── 🛠️ dependency_checker.py              # Dependency checking utility
+├── 📁 scripts/                           # Launcher and setup scripts
+│   ├── 🌍 run_gui.py                     # Cross-platform launcher
+│   ├── ⚙️ setup.bat / setup.sh          # Platform-specific setup scripts
+│   └── 🚀 run_gui.bat / run_gui.sh       # Platform-specific launcher scripts
+├── 📁 docs/                              # Documentation
+│   ├── 📄 CROSS_PLATFORM_SETUP.md        # Cross-platform setup guide
+│   ├── 📄 TESTING.md                     # Testing guide
+│   └── 📄 LASTFM_SETUP.md                # Last.fm API setup guide
+└── 📁 assets/                            # Images and icons
+    ├── 🖼️ LogoIcon.png                   # Application logo (PNG)
+    └── 🖼️ LogoIcon.ico                   # Application icon (ICO)
 ```
 
 ## 🖥️ GUI Application
@@ -287,6 +389,32 @@ python-dotenv>=1.0.0       # Environment variables
 # GUI (tkinter included with Python)
 ```
 
+## 🌍 Cross-Platform Compatibility
+
+This application is **fully cross-platform** and works on:
+
+- ✅ **Windows** (Windows 10/11)
+- ✅ **Linux** (Ubuntu, Debian, Fedora, Arch, etc.)
+- ✅ **macOS** (10.14+)
+
+### Platform-Specific Notes
+
+- **Path Handling**: Uses `pathlib.Path` for cross-platform path operations
+- **File Separators**: Automatically handles `/` vs `\` differences
+- **GPU Support**:
+  - Windows/Linux: NVIDIA, AMD, Intel GPUs
+  - macOS: Apple Silicon and Intel GPUs via VideoToolbox
+- **External Tools**: FFmpeg and Chromaprint must be installed per platform (see installation instructions above)
+
+### Recommended Launcher
+
+Use `run_gui.py` for the best cross-platform experience:
+
+- Automatically detects your platform
+- Provides platform-specific installation instructions
+- Handles virtual environment setup
+- Checks all dependencies
+
 ## 🚨 Troubleshooting
 
 ### Common Issues
@@ -341,6 +469,15 @@ python-dotenv>=1.0.0       # Environment variables
 
 - Check if tkinter is installed: `python -c "import tkinter"`
 - On Linux: `sudo apt install python3-tk`
+- On macOS/Windows: Usually included with Python; if missing, reinstall Python
+
+#### ❌ "Dependencies not found" warnings
+
+**Solutions**:
+
+- Use the cross-platform launcher: `python run_gui.py` - it will show installation instructions
+- Check the dependency status: `python dependency_checker.py`
+- Install missing dependencies using platform-specific commands (see Prerequisites section)
 
 ### Performance Tips
 

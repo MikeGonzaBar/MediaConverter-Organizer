@@ -32,6 +32,15 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Clean up corrupted pip distributions before installing
+echo Cleaning up corrupted pip distributions...
+for /d %%d in (.venv\Lib\site-packages\~ip*) do (
+    if exist "%%d" (
+        echo Removing corrupted distribution: %%d
+        rmdir /s /q "%%d" 2>nul
+    )
+)
+
 REM Install/update requirements
 echo Installing requirements...
 pip install -r requirements.txt
@@ -42,15 +51,15 @@ if errorlevel 1 (
 )
 
 REM Check if main scripts exist
-if not exist "image_organizer.py" (
-    echo ERROR: image_organizer.py not found
+if not exist "src\image_organizer.py" (
+    echo ERROR: src\image_organizer.py not found
     echo Please ensure you're running this from the correct directory
     pause
     exit /b 1
 )
 
-if not exist "wav_to_flac_converter.py" (
-    echo ERROR: wav_to_flac_converter.py not found
+if not exist "src\wav_to_flac_converter.py" (
+    echo ERROR: src\wav_to_flac_converter.py not found
     echo Please ensure you're running this from the correct directory
     pause
     exit /b 1
@@ -59,7 +68,7 @@ if not exist "wav_to_flac_converter.py" (
 REM Run the GUI
 echo Starting Media Converter ^& Organizer GUI...
 echo.
-python media_converter_organizer_gui.py
+python main.py
 
 REM Keep window open if there's an error
 if errorlevel 1 (

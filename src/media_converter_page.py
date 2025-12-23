@@ -6,8 +6,9 @@ Handles the comprehensive media converter UI and logic
 import tkinter as tk
 from tkinter import ttk, filedialog
 import threading
-from media_converter import MediaConverter
-from ui_components import TooltipManager
+from src.media_converter import MediaConverter
+from src.ui_components import TooltipManager
+from src.gui_utils import WindowManager
 
 
 class MediaConverterPage:
@@ -78,13 +79,12 @@ class MediaConverterPage:
         self.simple_mode_status = ttk.Label(
             mode_frame, 
             text="✅ Using optimal settings for format conversion", 
-            style='Success.TLabel',
-            font=('Segoe UI', 9)
+            style='Success.TLabel'
         )
         self.simple_mode_status.pack(side=tk.LEFT, padx=(20, 0))
         
-        # Create scrollable content
-        canvas = tk.Canvas(page, bg='#f8f9fa', highlightthickness=0)
+        # Create scrollable content with Windows 11 dark theme background
+        canvas = tk.Canvas(page, bg='#202020', highlightthickness=0, borderwidth=0)
         scrollbar = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style='Content.TFrame')
         
@@ -116,47 +116,43 @@ class MediaConverterPage:
         scrollable_frame.bind("<Button-4>", _on_mousewheel)
         scrollable_frame.bind("<Button-5>", _on_mousewheel)
         
-        # Input/Output Selection Card
-        io_card = ttk.Frame(scrollable_frame, style='Content.TFrame')
-        io_card.pack(fill=tk.X, pady=(0, 20))
-        
-        # Add custom title
-        io_title = ttk.Label(io_card, text="📂 Input & Output", style='Info.TLabel', font=('Segoe UI', 11, 'bold'))
-        io_title.pack(anchor=tk.W, pady=(0, 15))
+        # Input/Output Selection Card - Modern Windows 11 style
+        io_card, io_content = WindowManager.create_modern_section(scrollable_frame, "📂 Input & Output")
+        io_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Mode toggle (Directory vs Single File)
-        mode_frame = ttk.Frame(io_card)
+        mode_frame = ttk.Frame(io_content)
         mode_frame.pack(fill=tk.X, pady=(0, 10))
         ttk.Radiobutton(mode_frame, text="📁 Directory Mode", variable=self.input_mode_var, value="directory", command=self.update_source_visibility).pack(side=tk.LEFT, padx=(0, 15))
         ttk.Radiobutton(mode_frame, text="🎵 Single File Mode", variable=self.input_mode_var, value="single", command=self.update_source_visibility).pack(side=tk.LEFT)
 
         # Input directory
-        self.input_dir_label = ttk.Label(io_card, text="📁 Input Directory:", style='Info.TLabel')
-        input_frame = ttk.Frame(io_card)
+        self.input_dir_label = ttk.Label(io_content, text="📁 Input Directory:", style='Info.TLabel')
+        input_frame = ttk.Frame(io_content)
         
         input_entry = ttk.Entry(input_frame, textvariable=self.media_input_dir_var, width=60, font=('Segoe UI', 10))
         input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        input_browse_btn = ttk.Button(input_frame, text="📁 Browse", command=self.browse_media_input_directory, style='Primary.TButton')
+        input_browse_btn = WindowManager.create_gray_button(input_frame, text="📁 Browse", command=self.browse_media_input_directory)
         input_browse_btn.pack(side=tk.RIGHT)
 
         # Input file (shown in single mode)
-        self.input_file_label = ttk.Label(io_card, text="🎵 Input File:", style='Info.TLabel')
-        self.input_file_frame = ttk.Frame(io_card)
+        self.input_file_label = ttk.Label(io_content, text="🎵 Input File:", style='Info.TLabel')
+        self.input_file_frame = ttk.Frame(io_content)
         self.input_file_entry = ttk.Entry(self.input_file_frame, textvariable=self.media_input_file_var, width=60, font=('Segoe UI', 10))
         self.input_file_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
-        self.input_file_btn = ttk.Button(self.input_file_frame, text="🎵 Browse File", command=self.browse_media_input_file, style='Primary.TButton')
+        self.input_file_btn = WindowManager.create_gray_button(self.input_file_frame, text="🎵 Browse File", command=self.browse_media_input_file)
         self.input_file_btn.pack(side=tk.RIGHT)
         
         # Output directory
-        output_frame = ttk.Frame(io_card)
+        output_frame = ttk.Frame(io_content)
         output_frame.pack(fill=tk.X, pady=(0, 0))
         
         ttk.Label(output_frame, text="📁 Output Directory:", style='Info.TLabel').pack(anchor=tk.W)
         output_entry = ttk.Entry(output_frame, textvariable=self.media_output_dir_var, width=60, font=('Segoe UI', 10))
         output_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        output_browse_btn = ttk.Button(output_frame, text="📁 Browse", command=self.browse_media_output_directory, style='Primary.TButton')
+        output_browse_btn = WindowManager.create_gray_button(output_frame, text="📁 Browse", command=self.browse_media_output_directory)
         output_browse_btn.pack(side=tk.RIGHT)
 
         # Initial visibility - set up widget references
@@ -169,28 +165,20 @@ class MediaConverterPage:
         
         # Defer simple mode activation until all sections are created
         
-        # Media Type Selection Card
-        type_card = ttk.Frame(scrollable_frame, style='Content.TFrame')
-        type_card.pack(fill=tk.X, pady=(0, 20))
+        # Media Type Selection Card - Modern Windows 11 style
+        type_card, type_content = WindowManager.create_modern_section(scrollable_frame, "🎯 Media Type")
+        type_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
-        # Add custom title
-        type_title = ttk.Label(type_card, text="🎯 Media Type", style='Info.TLabel', font=('Segoe UI', 11, 'bold'))
-        type_title.pack(anchor=tk.W, pady=(0, 15))
+        ttk.Radiobutton(type_content, text="🎵 Audio Files", variable=self.media_type_var, value="audio", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 8))
+        ttk.Radiobutton(type_content, text="🖼️ Image Files", variable=self.media_type_var, value="image", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 8))
+        ttk.Radiobutton(type_content, text="🎬 Video Files", variable=self.media_type_var, value="video", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 0))
         
-        ttk.Radiobutton(type_card, text="🎵 Audio Files", variable=self.media_type_var, value="audio", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 8))
-        ttk.Radiobutton(type_card, text="🖼️ Image Files", variable=self.media_type_var, value="image", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 8))
-        ttk.Radiobutton(type_card, text="🎬 Video Files", variable=self.media_type_var, value="video", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 0))
-        
-        # Format Selection Card
-        self.format_card = ttk.Frame(scrollable_frame, style='Content.TFrame')
-        self.format_card.pack(fill=tk.X, pady=(0, 20))
-        
-        # Add custom title
-        format_title = ttk.Label(self.format_card, text="📋 Format Selection", style='Info.TLabel', font=('Segoe UI', 11, 'bold'))
-        format_title.pack(anchor=tk.W, pady=(0, 15))
+        # Format Selection Card - Modern Windows 11 style
+        self.format_card, format_content = WindowManager.create_modern_section(scrollable_frame, "📋 Format Selection")
+        self.format_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Input format
-        input_format_frame = ttk.Frame(self.format_card)
+        input_format_frame = ttk.Frame(format_content)
         input_format_frame.pack(fill=tk.X, pady=(0, 15))
         
         ttk.Label(input_format_frame, text="📥 Input Format:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
@@ -199,23 +187,19 @@ class MediaConverterPage:
         self.input_format_combo.bind('<<ComboboxSelected>>', self.on_input_format_change)
         
         # Output format
-        output_format_frame = ttk.Frame(self.format_card)
+        output_format_frame = ttk.Frame(format_content)
         output_format_frame.pack(fill=tk.X, pady=(0, 0))
         
         ttk.Label(output_format_frame, text="📤 Output Format:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
         self.output_format_combo = ttk.Combobox(output_format_frame, textvariable=self.output_format_var, state="readonly", font=('Segoe UI', 10))
         self.output_format_combo.pack(fill=tk.X, pady=(0, 0))
         
-        # Quality Settings Card
-        self.quality_card = ttk.Frame(scrollable_frame, style='Content.TFrame')
-        self.quality_card.pack(fill=tk.X, pady=(0, 20))
-        
-        # Add custom title
-        quality_title = ttk.Label(self.quality_card, text="⚙️ Quality Settings", style='Info.TLabel', font=('Segoe UI', 11, 'bold'))
-        quality_title.pack(anchor=tk.W, pady=(0, 15))
+        # Quality Settings Card - Modern Windows 11 style
+        self.quality_card, quality_content = WindowManager.create_modern_section(scrollable_frame, "⚙️ Quality Settings")
+        self.quality_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Audio quality settings
-        self.audio_quality_frame = ttk.Frame(self.quality_card)
+        self.audio_quality_frame = ttk.Frame(quality_content)
         self.audio_quality_frame.pack(fill=tk.X, pady=(0, 15))
         
         ttk.Label(self.audio_quality_frame, text="🎵 Audio Quality:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
@@ -225,7 +209,7 @@ class MediaConverterPage:
         ttk.Radiobutton(self.audio_quality_frame, text="💾 Low Quality (128 kbps)", variable=self.audio_quality_var, value="low").pack(anchor=tk.W, pady=(0, 0))
         
         # Video quality settings
-        self.video_quality_frame = ttk.Frame(self.quality_card)
+        self.video_quality_frame = ttk.Frame(quality_content)
         self.video_quality_frame.pack(fill=tk.X, pady=(0, 15))
         
         ttk.Label(self.video_quality_frame, text="🎬 Video Quality:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
@@ -244,7 +228,7 @@ class MediaConverterPage:
         ttk.Radiobutton(self.video_quality_frame, text="🎬 24 FPS (Cinematic)", variable=self.framerate_var, value="24").pack(anchor=tk.W, pady=(0, 0))
         
         # Image quality settings
-        self.image_quality_frame = ttk.Frame(self.quality_card)
+        self.image_quality_frame = ttk.Frame(quality_content)
         self.image_quality_frame.pack(fill=tk.X, pady=(0, 0))
         
         ttk.Label(self.image_quality_frame, text="🖼️ Image Quality:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
@@ -253,16 +237,12 @@ class MediaConverterPage:
         ttk.Radiobutton(self.image_quality_frame, text="📱 Standard Quality (80%)", variable=self.image_quality_var, value="standard").pack(anchor=tk.W, pady=(0, 5))
         ttk.Radiobutton(self.image_quality_frame, text="💾 Low Quality (60%)", variable=self.image_quality_var, value="low").pack(anchor=tk.W, pady=(0, 0))
         
-        # Advanced Options Card
-        self.advanced_card = ttk.Frame(scrollable_frame, style='Content.TFrame')
-        self.advanced_card.pack(fill=tk.X, pady=(0, 20))
-        
-        # Add custom title
-        advanced_title = ttk.Label(self.advanced_card, text="🔧 Advanced Options", style='Info.TLabel', font=('Segoe UI', 11, 'bold'))
-        advanced_title.pack(anchor=tk.W, pady=(0, 15))
+        # Advanced Options Card - Modern Windows 11 style
+        self.advanced_card, advanced_content = WindowManager.create_modern_section(scrollable_frame, "🔧 Advanced Options")
+        self.advanced_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Video encoding options
-        self.video_encoding_frame = ttk.Frame(self.advanced_card)
+        self.video_encoding_frame = ttk.Frame(advanced_content)
         self.video_encoding_frame.pack(fill=tk.X, pady=(0, 15))
         
         ttk.Label(self.video_encoding_frame, text="🎬 Video Encoding:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
@@ -271,7 +251,7 @@ class MediaConverterPage:
         ttk.Radiobutton(self.video_encoding_frame, text="📹 VP9 (Web Optimized)", variable=self.video_codec_var, value="vp9").pack(anchor=tk.W, pady=(0, 0))
         
         # Audio encoding options
-        self.audio_encoding_frame = ttk.Frame(self.advanced_card)
+        self.audio_encoding_frame = ttk.Frame(advanced_content)
         self.audio_encoding_frame.pack(fill=tk.X, pady=(0, 15))
         
         ttk.Label(self.audio_encoding_frame, text="🎵 Audio Encoding:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
@@ -287,7 +267,7 @@ class MediaConverterPage:
         ttk.Radiobutton(self.audio_encoding_frame, text="🎵 Mix All Streams", variable=self.audio_stream_var, value="mix").pack(anchor=tk.W, pady=(0, 0))
         
         # Subtitle options
-        self.subtitle_frame = ttk.Frame(self.advanced_card)
+        self.subtitle_frame = ttk.Frame(advanced_content)
         self.subtitle_frame.pack(fill=tk.X, pady=(0, 15))
         
         self.subtitle_var = tk.BooleanVar(value=False)
@@ -312,13 +292,13 @@ class MediaConverterPage:
         ttk.Radiobutton(self.subtitle_frame, text="📝 Use Best Quality Stream", variable=self.subtitle_stream_var, value="best").pack(anchor=tk.W, pady=(0, 0))
         
         # Shared metadata option
-        self.metadata_frame = ttk.Frame(self.advanced_card)
+        self.metadata_frame = ttk.Frame(advanced_content)
         self.metadata_frame.pack(fill=tk.X, pady=(0, 0))
         
         ttk.Checkbutton(self.metadata_frame, text="🏷️ Share metadata between audio and video", variable=self.shared_metadata_var).pack(anchor=tk.W, pady=(0, 15))
         
         # GPU acceleration settings
-        self.gpu_frame = ttk.Frame(self.advanced_card)
+        self.gpu_frame = ttk.Frame(advanced_content)
         self.gpu_frame.pack(fill=tk.X, pady=(0, 0))
         
         ttk.Label(self.gpu_frame, text="🎮 GPU Acceleration:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
@@ -346,18 +326,14 @@ class MediaConverterPage:
         cpu_checkbox.pack(anchor=tk.W, pady=(0, 0))
         TooltipManager.create_tooltip(cpu_checkbox, "Force CPU encoding even if GPU is available. Useful for maximum quality or compatibility.")
         
-        # Action Card
-        action_card = ttk.Frame(scrollable_frame, style='Content.TFrame')
-        action_card.pack(fill=tk.X, pady=(0, 20))
+        # Action Card - Modern Windows 11 style
+        action_card, action_content = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
+        action_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
-        # Add custom title
-        action_title = ttk.Label(action_card, text="🚀 Actions", style='Info.TLabel', font=('Segoe UI', 11, 'bold'))
-        action_title.pack(anchor=tk.W, pady=(0, 15))
-        
-        self.media_convert_start_btn = ttk.Button(action_card, text="🚀 Start Conversion", command=self.start_media_conversion, style='Success.TButton')
+        self.media_convert_start_btn = WindowManager.create_gray_button(action_content, text="🚀 Start Conversion", command=self.start_media_conversion)
         self.media_convert_start_btn.pack(side=tk.LEFT, padx=(0, 15))
         
-        self.media_convert_stop_btn = ttk.Button(action_card, text="⏹️ Stop", command=self.stop_media_conversion, state=tk.DISABLED, style='Danger.TButton')
+        self.media_convert_stop_btn = WindowManager.create_gray_button(action_content, text="⏹️ Stop", command=self.stop_media_conversion, state=tk.DISABLED)
         self.media_convert_stop_btn.pack(side=tk.LEFT)
         
         # Pack canvas and scrollbar
@@ -365,7 +341,6 @@ class MediaConverterPage:
         scrollbar.pack(side="right", fill="y")
         
         # Bind mouse wheel to canvas
-        from gui_utils import WindowManager
         WindowManager.bind_mousewheel(canvas, scrollbar)
         
         # Initialize format options and visibility
@@ -458,8 +433,8 @@ class MediaConverterPage:
             self.simple_mode_status.pack_forget()
             
             # Show advanced sections
-            self.quality_card.pack(fill=tk.X, pady=(0, 20))
-            self.advanced_card.pack(fill=tk.X, pady=(0, 20))
+            self.quality_card.pack(fill=tk.X, pady=(0, 24), padx=0)
+            self.advanced_card.pack(fill=tk.X, pady=(0, 24), padx=0)
     
     def browse_media_input_directory(self):
         """Browse for media input directory"""

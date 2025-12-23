@@ -22,15 +22,32 @@ class MediaConverter:
     
     def _check_dependencies(self):
         """Check if required dependencies are available"""
+        import platform
+        
         # Check if ffmpeg is available
         if not shutil.which("ffmpeg"):
-            self.log_message("Warning: ffmpeg not found in PATH. Audio and video conversion may not work.", "WARNING")
+            system = platform.system()
+            install_cmd = {
+                "Windows": "winget install ffmpeg",
+                "Darwin": "brew install ffmpeg",
+                "Linux": "sudo apt install ffmpeg  # or: sudo dnf install ffmpeg"
+            }.get(system, "See https://ffmpeg.org/download.html")
+            
+            self.log_message(
+                f"Warning: ffmpeg not found in PATH. Audio and video conversion may not work.\n"
+                f"Install with: {install_cmd}",
+                "WARNING"
+            )
         
         # Check if PIL is available
         try:
             from PIL import Image
         except ImportError:
-            self.log_message("Warning: Pillow (PIL) not found. Image conversion may not work.", "WARNING")
+            self.log_message(
+                "Warning: Pillow (PIL) not found. Image conversion may not work.\n"
+                "Install with: pip install Pillow",
+                "WARNING"
+            )
     
     def _detect_gpu_acceleration(self):
         """Detect available GPU acceleration options"""

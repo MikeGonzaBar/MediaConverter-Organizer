@@ -64,6 +64,16 @@ echo.
 echo Upgrading pip...
 python -m pip install --upgrade pip
 
+REM Clean up corrupted pip distributions before installing
+echo.
+echo Cleaning up corrupted pip distributions...
+for /d %%d in (.venv\Lib\site-packages\~ip*) do (
+    if exist "%%d" (
+        echo Removing corrupted distribution: %%d
+        rmdir /s /q "%%d" 2>nul
+    )
+)
+
 REM Install requirements
 echo.
 echo Installing all dependencies...
@@ -77,15 +87,15 @@ if errorlevel 1 (
 REM Check if main scripts exist
 echo.
 echo Checking project structure...
-if not exist "image_organizer.py" (
-    echo ERROR: image_organizer.py not found
+if not exist "src\image_organizer.py" (
+    echo ERROR: src\image_organizer.py not found
     echo Please ensure you're running this from the correct directory
     pause
     exit /b 1
 )
 
-if not exist "wav_to_flac_converter.py" (
-    echo ERROR: wav_to_flac_converter.py not found
+if not exist "src\wav_to_flac_converter.py" (
+    echo ERROR: src\wav_to_flac_converter.py not found
     echo Please ensure you're running this from the correct directory
     pause
     exit /b 1
@@ -97,8 +107,8 @@ echo Setup completed successfully!
 echo ==========================================
 echo.
 echo You can now run:
-echo   - GUI: run_gui.bat
-echo   - Or manually: python media_converter_organizer_gui.py
+echo   - GUI: scripts\run_gui.bat
+echo   - Or manually: python main.py
 echo.
 echo To activate the virtual environment manually:
 echo   .venv\Scripts\activate.bat

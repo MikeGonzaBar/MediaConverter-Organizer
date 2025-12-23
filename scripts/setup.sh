@@ -53,6 +53,11 @@ echo
 echo "Upgrading pip..."
 python -m pip install --upgrade pip
 
+# Clean up corrupted pip distributions before installing
+echo
+echo "Cleaning up corrupted pip distributions..."
+find .venv/lib/python*/site-packages -maxdepth 1 -type d -name "~ip*" -exec rm -rf {} + 2>/dev/null || true
+
 # Install requirements
 echo
 echo "Installing all dependencies..."
@@ -65,14 +70,14 @@ fi
 # Check if main scripts exist
 echo
 echo "Checking project structure..."
-if [ ! -f "image_organizer.py" ]; then
-    echo "ERROR: image_organizer.py not found"
+if [ ! -f "src/image_organizer.py" ]; then
+    echo "ERROR: src/image_organizer.py not found"
     echo "Please ensure you're running this from the correct directory"
     exit 1
 fi
 
-if [ ! -f "wav_to_flac_converter.py" ]; then
-    echo "ERROR: wav_to_flac_converter.py not found"
+if [ ! -f "src/wav_to_flac_converter.py" ]; then
+    echo "ERROR: src/wav_to_flac_converter.py not found"
     echo "Please ensure you're running this from the correct directory"
     exit 1
 fi
@@ -83,8 +88,8 @@ echo "Setup completed successfully!"
 echo "=========================================="
 echo
 echo "You can now run:"
-echo "  - GUI: ./run_gui.sh"
-echo "  - Or manually: python3 media_converter_organizer_gui.py"
+echo "  - GUI: ./scripts/run_gui.sh"
+echo "  - Or manually: python3 main.py"
 echo
 echo "To activate the virtual environment manually:"
 echo "  source .venv/bin/activate"

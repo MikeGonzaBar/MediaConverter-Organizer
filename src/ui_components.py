@@ -48,6 +48,8 @@ class MediaOrganizerPage:
     
     def create_page(self):
         """Create the Media Organizer page"""
+        from src.gui_utils import WindowManager
+        
         page = ttk.Frame(self.parent, style='Content.TFrame')
         
         # Page title
@@ -55,7 +57,7 @@ class MediaOrganizerPage:
         title_label.pack(pady=(0, 30))
         
         # Create scrollable content
-        canvas = tk.Canvas(page, bg='#f8f9fa', highlightthickness=0)
+        canvas = tk.Canvas(page, bg='#202020', highlightthickness=0, borderwidth=0)
         scrollbar = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style='Content.TFrame')
         
@@ -67,27 +69,27 @@ class MediaOrganizerPage:
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Directory Selection Card
-        dir_card = ttk.LabelFrame(scrollable_frame, text="📂 Directory Selection", padding=20)
-        dir_card.pack(fill=tk.X, pady=(0, 20))
+        # Directory Selection Card - Use same helper as Media Converter
+        dir_card, content_frame = WindowManager.create_modern_section(scrollable_frame, "📂 Directory Selection")
+        dir_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
-        ttk.Label(dir_card, text="📁 Media Directory:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 10))
+        ttk.Label(content_frame, text="📁 Media Directory:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 10))
         
-        dir_frame = ttk.Frame(dir_card)
+        dir_frame = ttk.Frame(content_frame)
         dir_frame.pack(fill=tk.X, pady=(0, 0))
         
         dir_entry = ttk.Entry(dir_frame, textvariable=self.media_dir_var, width=60, font=('Segoe UI', 10))
         dir_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        browse_btn = ttk.Button(dir_frame, text="📁 Browse", command=self.browse_media_directory, style='Primary.TButton')
+        browse_btn = WindowManager.create_gray_button(dir_frame, text="📁 Browse", command=self.browse_media_directory)
         browse_btn.pack(side=tk.RIGHT)
         
-        # Operation Mode Card
-        mode_card = ttk.LabelFrame(scrollable_frame, text="⚙️ Operation Mode", padding=20)
-        mode_card.pack(fill=tk.X, pady=(0, 20))
+        # Operation Mode Card - Use same helper as Media Converter
+        mode_card, mode_content_frame = WindowManager.create_modern_section(scrollable_frame, "⚙️ Operation Mode")
+        mode_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Check Only option
-        check_frame = ttk.Frame(mode_card)
+        check_frame = ttk.Frame(mode_content_frame)
         check_frame.pack(fill=tk.X, pady=(0, 10))
         
         check_radio = ttk.Radiobutton(check_frame, text="🔍 Check Only", variable=self.organize_mode_var, value="check")
@@ -95,7 +97,7 @@ class MediaOrganizerPage:
         TooltipManager.create_tooltip(check_radio, "Only analyze files and show what would be organized without making any changes")
         
         # Dry Run option
-        dry_run_frame = ttk.Frame(mode_card)
+        dry_run_frame = ttk.Frame(mode_content_frame)
         dry_run_frame.pack(fill=tk.X, pady=(0, 10))
         
         dry_run_radio = ttk.Radiobutton(dry_run_frame, text="🧪 Dry Run", variable=self.organize_mode_var, value="dry_run")
@@ -103,21 +105,21 @@ class MediaOrganizerPage:
         TooltipManager.create_tooltip(dry_run_radio, "Simulate the organization process and show detailed logs without actually moving files")
         
         # Actually Move Files option
-        move_frame = ttk.Frame(mode_card)
+        move_frame = ttk.Frame(mode_content_frame)
         move_frame.pack(fill=tk.X, pady=(0, 0))
         
         move_radio = ttk.Radiobutton(move_frame, text="🚀 Actually Move Files", variable=self.organize_mode_var, value="move")
         move_radio.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(move_radio, "Actually organize files by moving them to appropriate folders based on their metadata")
         
-        # Action Card
-        action_card = ttk.LabelFrame(scrollable_frame, text="🚀 Actions", padding=20)
-        action_card.pack(fill=tk.X, pady=(0, 20))
+        # Action Card - Use same helper as Media Converter
+        action_card, action_content_frame = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
+        action_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
-        self.start_btn = ttk.Button(action_card, text="🚀 Start Organization", command=self.start_organization, style='Success.TButton')
+        self.start_btn = WindowManager.create_gray_button(action_content_frame, text="🚀 Start Organization", command=self.start_organization)
         self.start_btn.pack(side=tk.LEFT, padx=(0, 15))
         
-        self.stop_btn = ttk.Button(action_card, text="⏹️ Stop", command=self.stop_organization, state=tk.DISABLED, style='Danger.TButton')
+        self.stop_btn = WindowManager.create_gray_button(action_content_frame, text="⏹️ Stop", command=self.stop_organization, state=tk.DISABLED)
         self.stop_btn.pack(side=tk.LEFT)
         
         # Pack canvas and scrollbar
@@ -125,7 +127,7 @@ class MediaOrganizerPage:
         scrollbar.pack(side="right", fill="y")
         
         # Bind mouse wheel to canvas
-        from gui_utils import WindowManager
+        from src.gui_utils import WindowManager
         WindowManager.bind_mousewheel(canvas, scrollbar)
         
         return page
@@ -161,8 +163,8 @@ class MediaOrganizerPage:
             
             # Import and run the appropriate organizer
             if mode == "check":
-                from image_organizer import ImageOrganizer
-                from video_organizer import VideoOrganizer
+                from src.image_organizer import ImageOrganizer
+                from src.video_organizer import VideoOrganizer
                 
                 # Check images
                 img_organizer = ImageOrganizer(directory, mode="check", log_callback=self.log_callback)
@@ -173,8 +175,8 @@ class MediaOrganizerPage:
                 vid_organizer.organize_videos()
                 
             elif mode == "dry_run":
-                from image_organizer import ImageOrganizer
-                from video_organizer import VideoOrganizer
+                from src.image_organizer import ImageOrganizer
+                from src.video_organizer import VideoOrganizer
                 
                 # Dry run images
                 img_organizer = ImageOrganizer(directory, mode="dry_run", log_callback=self.log_callback)
@@ -185,8 +187,8 @@ class MediaOrganizerPage:
                 vid_organizer.organize_videos()
                 
             elif mode == "move":
-                from image_organizer import ImageOrganizer
-                from video_organizer import VideoOrganizer
+                from src.image_organizer import ImageOrganizer
+                from src.video_organizer import VideoOrganizer
                 
                 # Actually organize images
                 img_organizer = ImageOrganizer(directory, mode="move", log_callback=self.log_callback)
@@ -239,7 +241,7 @@ class WAVConverterPage:
         title_label.pack(pady=(0, 30))
         
         # Create scrollable content
-        canvas = tk.Canvas(page, bg='#f8f9fa', highlightthickness=0)
+        canvas = tk.Canvas(page, bg='#202020', highlightthickness=0, borderwidth=0)
         scrollbar = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style='Content.TFrame')
         
@@ -274,7 +276,7 @@ class WAVConverterPage:
         dir_entry = ttk.Entry(dir_frame, textvariable=self.wav_dir_var, width=60, font=('Segoe UI', 10))
         dir_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        browse_btn = ttk.Button(dir_frame, text="📁 Browse", command=self.browse_wav_directory, style='Primary.TButton')
+        browse_btn = WindowManager.create_gray_button(dir_frame, text="📁 Browse", command=self.browse_wav_directory)
         browse_btn.pack(side=tk.RIGHT)
 
         # Single file selection (hidden by default)
@@ -284,7 +286,7 @@ class WAVConverterPage:
         self.file_entry = ttk.Entry(self.file_frame, textvariable=self.wav_file_var, width=60, font=('Segoe UI', 10))
         self.file_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        self.file_browse_btn = ttk.Button(self.file_frame, text="🎵 Browse File", command=self.browse_wav_file, style='Primary.TButton')
+        self.file_browse_btn = WindowManager.create_gray_button(self.file_frame, text="🎵 Browse File", command=self.browse_wav_file)
         self.file_browse_btn.pack(side=tk.RIGHT)
         
         # Output Directory Card
@@ -300,7 +302,7 @@ class WAVConverterPage:
         out_entry = ttk.Entry(out_frame, textvariable=self.output_dir_var, width=60, font=('Segoe UI', 10))
         out_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        out_browse_btn = ttk.Button(out_frame, text="📁 Browse", command=self.browse_output_directory, style='Primary.TButton')
+        out_browse_btn = WindowManager.create_gray_button(out_frame, text="📁 Browse", command=self.browse_output_directory)
         out_browse_btn.pack(side=tk.RIGHT)
 
         # Quality Settings Card
@@ -343,14 +345,14 @@ class WAVConverterPage:
         fingerprint_check.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(fingerprint_check, "Use audio fingerprinting to identify songs and retrieve metadata")
         
-        # Action Card
-        action_card = ttk.LabelFrame(scrollable_frame, text="🚀 Actions", padding=20)
+        # Action Card - Use same helper as Media Converter
+        action_card, action_content_frame = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
         action_card.pack(fill=tk.X, pady=(0, 20))
         
-        self.start_btn = ttk.Button(action_card, text="🚀 Start Conversion", command=self.start_conversion, style='Success.TButton')
+        self.start_btn = WindowManager.create_gray_button(action_content_frame, text="🚀 Start Conversion", command=self.start_conversion)
         self.start_btn.pack(side=tk.LEFT, padx=(0, 15))
         
-        self.stop_btn = ttk.Button(action_card, text="⏹️ Stop", command=self.stop_conversion, state=tk.DISABLED, style='Danger.TButton')
+        self.stop_btn = WindowManager.create_gray_button(action_content_frame, text="⏹️ Stop", command=self.stop_conversion, state=tk.DISABLED)
         self.stop_btn.pack(side=tk.LEFT)
         
         # Pack canvas and scrollbar
@@ -358,7 +360,7 @@ class WAVConverterPage:
         scrollbar.pack(side="right", fill="y")
         
         # Bind mouse wheel to canvas
-        from gui_utils import WindowManager
+        from src.gui_utils import WindowManager
         WindowManager.bind_mousewheel(canvas, scrollbar)
         
         # Initial visibility for source inputs (toggle frames/labels, not inner widgets)
@@ -469,7 +471,7 @@ class WAVConverterPage:
             self.log_callback(f"Starting WAV to FLAC conversion in {quality} mode", "INFO")
             
             # Use enhanced converter (directory or single file)
-            from wav_to_flac_converter import EnhancedWAVToFLACConverter
+            from src.wav_to_flac_converter import EnhancedWAVToFLACConverter
             
             # Decide source path for converter
             if mode == "single":

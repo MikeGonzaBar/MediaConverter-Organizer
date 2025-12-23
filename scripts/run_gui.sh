@@ -38,6 +38,10 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Clean up corrupted pip distributions before installing
+echo "Cleaning up corrupted pip distributions..."
+find .venv/lib/python*/site-packages -maxdepth 1 -type d -name "~ip*" -exec rm -rf {} + 2>/dev/null || true
+
 # Install/update requirements
 echo "Installing requirements..."
 pip install -r requirements.txt
@@ -47,14 +51,14 @@ if [ $? -ne 0 ]; then
 fi
 
 # Check if main scripts exist
-if [ ! -f "image_organizer.py" ]; then
-    echo "ERROR: image_organizer.py not found"
+if [ ! -f "src/image_organizer.py" ]; then
+    echo "ERROR: src/image_organizer.py not found"
     echo "Please ensure you're running this from the correct directory"
     exit 1
 fi
 
-if [ ! -f "wav_to_flac_converter.py" ]; then
-    echo "ERROR: wav_to_flac_converter.py not found"
+if [ ! -f "src/wav_to_flac_converter.py" ]; then
+    echo "ERROR: src/wav_to_flac_converter.py not found"
     echo "Please ensure you're running this from the correct directory"
     exit 1
 fi
@@ -62,7 +66,7 @@ fi
 # Run the GUI
 echo "Starting Media Converter & Organizer GUI..."
 echo
-python3 media_converter_organizer_gui.py
+python3 main.py
 
 # Check exit status
 if [ $? -ne 0 ]; then
