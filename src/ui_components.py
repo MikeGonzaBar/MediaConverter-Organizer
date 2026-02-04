@@ -40,9 +40,10 @@ class TooltipManager:
 class MediaOrganizerPage:
     """Creates the Media Organizer page"""
     
-    def __init__(self, parent, log_callback):
+    def __init__(self, parent, log_callback, theme_manager):
         self.parent = parent
         self.log_callback = log_callback
+        self.theme_manager = theme_manager
         self.organize_mode_var = tk.StringVar(value="check")
         self.media_dir_var = tk.StringVar()
     
@@ -70,7 +71,7 @@ class MediaOrganizerPage:
         canvas.configure(yscrollcommand=scrollbar.set)
         
         # Directory Selection Card - Use same helper as Media Converter
-        dir_card, content_frame = WindowManager.create_modern_section(scrollable_frame, "📂 Directory Selection")
+        dir_card, content_frame = WindowManager.create_modern_section(scrollable_frame, "📂 Directory Selection", theme_manager=self.theme_manager)
         dir_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         ttk.Label(content_frame, text="📁 Media Directory:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 10))
@@ -85,7 +86,7 @@ class MediaOrganizerPage:
         browse_btn.pack(side=tk.RIGHT)
         
         # Operation Mode Card - Use same helper as Media Converter
-        mode_card, mode_content_frame = WindowManager.create_modern_section(scrollable_frame, "⚙️ Operation Mode")
+        mode_card, mode_content_frame = WindowManager.create_modern_section(scrollable_frame, "⚙️ Operation Mode", theme_manager=self.theme_manager)
         mode_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Check Only option
@@ -113,7 +114,7 @@ class MediaOrganizerPage:
         TooltipManager.create_tooltip(move_radio, "Actually organize files by moving them to appropriate folders based on their metadata")
         
         # Action Card - Use same helper as Media Converter
-        action_card, action_content_frame = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
+        action_card, action_content_frame = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions", theme_manager=self.theme_manager)
         action_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         self.start_btn = WindowManager.create_gray_button(action_content_frame, text="🚀 Start Organization", command=self.start_organization)
@@ -131,7 +132,7 @@ class MediaOrganizerPage:
         WindowManager.bind_mousewheel(canvas, scrollbar)
         
         return page
-    
+
     def browse_media_directory(self):
         """Browse for media directory"""
         directory = filedialog.askdirectory(title="Select Media Directory")
@@ -218,9 +219,10 @@ class MediaOrganizerPage:
 class WAVConverterPage:
     """Creates the WAV to FLAC Converter page"""
     
-    def __init__(self, parent, log_callback):
+    def __init__(self, parent, log_callback, theme_manager):
         self.parent = parent
         self.log_callback = log_callback
+        self.theme_manager = theme_manager
         self.wav_dir_var = tk.StringVar()
         self.wav_file_var = tk.StringVar()
         self.input_mode_var = tk.StringVar(value="directory")  # directory | single
@@ -346,7 +348,7 @@ class WAVConverterPage:
         TooltipManager.create_tooltip(fingerprint_check, "Use audio fingerprinting to identify songs and retrieve metadata")
         
         # Action Card - Use same helper as Media Converter
-        action_card, action_content_frame = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
+        action_card, action_content_frame = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions", theme_manager=self.theme_manager)
         action_card.pack(fill=tk.X, pady=(0, 20))
         
         self.start_btn = WindowManager.create_gray_button(action_content_frame, text="🚀 Start Conversion", command=self.start_conversion)
@@ -369,7 +371,7 @@ class WAVConverterPage:
         self._update_source_visibility()
 
         return page
-    
+
     def browse_wav_directory(self):
         """Browse for WAV directory"""
         directory = filedialog.askdirectory(title="Select WAV/FLAC Directory")

@@ -14,9 +14,10 @@ from src.gui_utils import WindowManager
 class MediaConverterPage:
     """Creates the comprehensive Media Converter page"""
     
-    def __init__(self, parent, log_callback):
+    def __init__(self, parent, log_callback, theme_manager):
         self.parent = parent
         self.log_callback = log_callback
+        self.theme_manager = theme_manager
         self.converter = MediaConverter(log_callback)
         
         # Initialize variables
@@ -83,41 +84,13 @@ class MediaConverterPage:
         )
         self.simple_mode_status.pack(side=tk.LEFT, padx=(20, 0))
         
-        # Create scrollable content with Windows 11 dark theme background
-        canvas = tk.Canvas(page, bg='#202020', highlightthickness=0, borderwidth=0)
-        scrollbar = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas, style='Content.TFrame')
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Enable mouse wheel scrolling on the main content (Windows/Mac/Linux)
-        def _on_mousewheel(event):
-            try:
-                # Windows / MacOS: event.delta is a multiple of 120 on Windows
-                if hasattr(event, "delta") and event.delta:
-                    canvas.yview_scroll(int(-event.delta / 120), "units")
-                # Linux: Button-4 (up) / Button-5 (down)
-                elif getattr(event, "num", None) in (4, 5):
-                    canvas.yview_scroll(-1 if event.num == 4 else 1, "units")
-            except Exception:
-                pass
-
-        # Bind mouse wheel to both the canvas and the inner frame
-        canvas.bind("<MouseWheel>", _on_mousewheel)
-        canvas.bind("<Button-4>", _on_mousewheel)
-        canvas.bind("<Button-5>", _on_mousewheel)
-        scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
-        scrollable_frame.bind("<Button-4>", _on_mousewheel)
-        scrollable_frame.bind("<Button-5>", _on_mousewheel)
+        # Create scrollable content using ttkbootstrap ScrolledFrame
+        from ttkbootstrap.scrolled import ScrolledFrame
+        scrollable_frame = ScrolledFrame(page, autohide=True, bootstyle="dark")
+        scrollable_frame.pack(fill=tk.BOTH, expand=True)
         
         # Input/Output Selection Card - Modern Windows 11 style
-        io_card, io_content = WindowManager.create_modern_section(scrollable_frame, "📂 Input & Output")
+        io_card, io_content = WindowManager.create_modern_section(scrollable_frame, "📂 Input & Output", theme_manager=self.theme_manager)
         io_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Mode toggle (Directory vs Single File)
@@ -166,7 +139,7 @@ class MediaConverterPage:
         # Defer simple mode activation until all sections are created
         
         # Media Type Selection Card - Modern Windows 11 style
-        type_card, type_content = WindowManager.create_modern_section(scrollable_frame, "🎯 Media Type")
+        type_card, type_content = WindowManager.create_modern_section(scrollable_frame, "🎯 Media Type", theme_manager=self.theme_manager)
         type_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         ttk.Radiobutton(type_content, text="🎵 Audio Files", variable=self.media_type_var, value="audio", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 8))
@@ -174,7 +147,7 @@ class MediaConverterPage:
         ttk.Radiobutton(type_content, text="🎬 Video Files", variable=self.media_type_var, value="video", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 0))
         
         # Format Selection Card - Modern Windows 11 style
-        self.format_card, format_content = WindowManager.create_modern_section(scrollable_frame, "📋 Format Selection")
+        self.format_card, format_content = WindowManager.create_modern_section(scrollable_frame, "📋 Format Selection", theme_manager=self.theme_manager)
         self.format_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Input format
@@ -182,20 +155,20 @@ class MediaConverterPage:
         input_format_frame.pack(fill=tk.X, pady=(0, 15))
         
         ttk.Label(input_format_frame, text="📥 Input Format:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        self.input_format_combo = ttk.Combobox(input_format_frame, textvariable=self.input_format_var, state="readonly", font=('Segoe UI', 10))
-        self.input_format_combo.pack(fill=tk.X, pady=(0, 0))
-        self.input_format_combo.bind('<<ComboboxSelected>>', self.on_input_format_change)
+        self.input_format_menu = ttk.OptionMenu(input_format_frame, self.input_format_var, None)
+        self.input_format_menu.pack(fill=tk.X, pady=(0, 0))
+        self.input_format_var.trace_add('write', lambda *args: self.on_input_format_change())
         
         # Output format
         output_format_frame = ttk.Frame(format_content)
         output_format_frame.pack(fill=tk.X, pady=(0, 0))
         
         ttk.Label(output_format_frame, text="📤 Output Format:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        self.output_format_combo = ttk.Combobox(output_format_frame, textvariable=self.output_format_var, state="readonly", font=('Segoe UI', 10))
-        self.output_format_combo.pack(fill=tk.X, pady=(0, 0))
+        self.output_format_menu = ttk.OptionMenu(output_format_frame, self.output_format_var, None)
+        self.output_format_menu.pack(fill=tk.X, pady=(0, 0))
         
         # Quality Settings Card - Modern Windows 11 style
-        self.quality_card, quality_content = WindowManager.create_modern_section(scrollable_frame, "⚙️ Quality Settings")
+        self.quality_card, quality_content = WindowManager.create_modern_section(scrollable_frame, "⚙️ Quality Settings", theme_manager=self.theme_manager)
         self.quality_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Audio quality settings
@@ -238,7 +211,7 @@ class MediaConverterPage:
         ttk.Radiobutton(self.image_quality_frame, text="💾 Low Quality (60%)", variable=self.image_quality_var, value="low").pack(anchor=tk.W, pady=(0, 0))
         
         # Advanced Options Card - Modern Windows 11 style
-        self.advanced_card, advanced_content = WindowManager.create_modern_section(scrollable_frame, "🔧 Advanced Options")
+        self.advanced_card, advanced_content = WindowManager.create_modern_section(scrollable_frame, "🔧 Advanced Options", theme_manager=self.theme_manager)
         self.advanced_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Video encoding options
@@ -318,8 +291,8 @@ class MediaConverterPage:
         gpu_selection_frame.pack(fill=tk.X, pady=(0, 5))
         
         ttk.Label(gpu_selection_frame, text="🎯 GPU Selection:", style='Info.TLabel').pack(side=tk.LEFT, padx=(0, 10))
-        self.gpu_combo = ttk.Combobox(gpu_selection_frame, textvariable=self.selected_gpu_var, state="readonly", width=20)
-        self.gpu_combo.pack(side=tk.LEFT)
+        self.gpu_menu = ttk.OptionMenu(gpu_selection_frame, self.selected_gpu_var, None)
+        self.gpu_menu.pack(side=tk.LEFT)
         self.update_gpu_selection_options()
         
         cpu_checkbox = ttk.Checkbutton(self.gpu_frame, text="💻 Force CPU encoding", variable=self.force_cpu_var, command=self.update_gpu_selection_visibility)
@@ -327,7 +300,7 @@ class MediaConverterPage:
         TooltipManager.create_tooltip(cpu_checkbox, "Force CPU encoding even if GPU is available. Useful for maximum quality or compatibility.")
         
         # Action Card - Modern Windows 11 style
-        action_card, action_content = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
+        action_card, action_content = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions", theme_manager=self.theme_manager)
         action_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         self.media_convert_start_btn = WindowManager.create_gray_button(action_content, text="🚀 Start Conversion", command=self.start_media_conversion)
@@ -335,13 +308,6 @@ class MediaConverterPage:
         
         self.media_convert_stop_btn = WindowManager.create_gray_button(action_content, text="⏹️ Stop", command=self.stop_media_conversion, state=tk.DISABLED)
         self.media_convert_stop_btn.pack(side=tk.LEFT)
-        
-        # Pack canvas and scrollbar
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Bind mouse wheel to canvas
-        WindowManager.bind_mousewheel(canvas, scrollbar)
         
         # Initialize format options and visibility
         self.update_format_options()
@@ -361,7 +327,7 @@ class MediaConverterPage:
         self.toggle_simple_mode()
 
         return page
-    
+
     def get_gpu_status_text(self):
         """Get GPU status text for display"""
         gpu_info = self.converter.gpu_info
@@ -389,7 +355,9 @@ class MediaConverterPage:
         for gpu in available_gpus:
             options.append(f"{gpu['type']} ({gpu['name']})")
         
-        self.gpu_combo['values'] = options
+        self.gpu_menu['menu'].delete(0, 'end')
+        for option in options:
+            self.gpu_menu['menu'].add_command(label=option, command=tk._setit(self.selected_gpu_var, option))
         if not self.selected_gpu_var.get() or self.selected_gpu_var.get() not in options:
             self.selected_gpu_var.set(options[0])
     
@@ -398,11 +366,11 @@ class MediaConverterPage:
         gpu_enabled = self.use_gpu_var.get() and not self.force_cpu_var.get()
         
         # Enable/disable GPU selection based on GPU acceleration setting
-        if hasattr(self, 'gpu_combo'):
+        if hasattr(self, 'gpu_menu'):
             if gpu_enabled:
-                self.gpu_combo.configure(state="readonly")
+                self.gpu_menu.configure(state="normal")
             else:
-                self.gpu_combo.configure(state="disabled")
+                self.gpu_menu.configure(state="disabled")
     
     def toggle_simple_mode(self):
         """Toggle between simple and advanced mode"""
@@ -488,16 +456,24 @@ class MediaConverterPage:
             }
         }
         
-        # Update combobox options
+        # Update menu options
         if media_type in format_options:
-            self.input_format_combo['values'] = format_options[media_type]["input"]
-            self.output_format_combo['values'] = format_options[media_type]["output"]
+            input_opts = format_options[media_type]["input"]
+            output_opts = format_options[media_type]["output"]
+            
+            self.input_format_menu['menu'].delete(0, 'end')
+            for opt in input_opts:
+                self.input_format_menu['menu'].add_command(label=opt, command=tk._setit(self.input_format_var, opt))
+            
+            self.output_format_menu['menu'].delete(0, 'end')
+            for opt in output_opts:
+                self.output_format_menu['menu'].add_command(label=opt, command=tk._setit(self.output_format_var, opt))
             
             # Set default values
-            if format_options[media_type]["input"]:
-                self.input_format_var.set(format_options[media_type]["input"][0])
-            if format_options[media_type]["output"]:
-                self.output_format_var.set(format_options[media_type]["output"][0])
+            if input_opts:
+                self.input_format_var.set(input_opts[0])
+            if output_opts:
+                self.output_format_var.set(output_opts[0])
         
         # Update visibility of quality settings
         self.update_quality_visibility()
@@ -525,7 +501,7 @@ class MediaConverterPage:
             self._file_widgets[0].pack(anchor=tk.W, pady=(0, 10))  # label
             self._file_widgets[1].pack(fill=tk.X, pady=(0, 15))  # frame
     
-    def on_input_format_change(self, event=None):
+    def on_input_format_change(self, *args):
         """Handle input format change to prevent same input/output format"""
         input_format = self.input_format_var.get()
         media_type = self.media_type_var.get()
@@ -540,7 +516,10 @@ class MediaConverterPage:
         if media_type in format_options:
             # Filter out the input format from output options
             available_outputs = [fmt for fmt in format_options[media_type] if fmt != input_format]
-            self.output_format_combo['values'] = available_outputs
+            
+            self.output_format_menu['menu'].delete(0, 'end')
+            for opt in available_outputs:
+                self.output_format_menu['menu'].add_command(label=opt, command=tk._setit(self.output_format_var, opt))
             
             # If current output format is the same as input, change it
             if self.output_format_var.get() == input_format and available_outputs:

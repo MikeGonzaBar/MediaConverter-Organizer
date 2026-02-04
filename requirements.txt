@@ -21,6 +21,7 @@ python-dotenv>=1.0.0       # Environment variable management
 # GUI Application Dependencies
 # =============================================================================
 # tkinter is included with Python standard library - no additional packages needed
+ttkbootstrap>=1.10.1       # Cross-platform consistent theming for Tkinter
 
 # =============================================================================
 # Optional Dependencies (uncomment if needed)
