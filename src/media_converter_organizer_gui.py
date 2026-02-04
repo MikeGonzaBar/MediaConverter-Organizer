@@ -9,6 +9,7 @@ from datetime import datetime
 import queue
 import threading
 import platform
+from typing import Any, Dict
 
 # Import our custom modules
 from src.gui_utils import WindowManager, LogManager, NavigationManager, ThemeManager
@@ -16,8 +17,22 @@ from src.ui_components import MediaOrganizerPage
 from src.media_converter_page import MediaConverterPage
 
 # Try to import dependency checker (optional)
+# Ensure name is always bound to satisfy type checkers
+class _DCPlaceholder:
+    def __init__(self) -> None:
+        pass
+    def check_all(self) -> Dict[str, Any]:
+        # Placeholder signature to satisfy type checkers; not used at runtime when checker is unavailable
+        return {
+            "ffmpeg": False,
+            "fpcalc": False,
+            "python_packages": ([], [])
+        }
+
+DependencyChecker = _DCPlaceholder  # will be replaced if import succeeds
 try:
-    from src.dependency_checker import DependencyChecker
+    from src.dependency_checker import DependencyChecker as _RealDependencyChecker
+    DependencyChecker = _RealDependencyChecker  # type: ignore[assignment]
     DEPENDENCY_CHECKER_AVAILABLE = True
 except ImportError:
     DEPENDENCY_CHECKER_AVAILABLE = False

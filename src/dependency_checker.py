@@ -5,7 +5,7 @@ Provides cross-platform dependency checking with helpful installation instructio
 
 import platform
 import shutil
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 
 class DependencyChecker:

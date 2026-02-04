@@ -5,14 +5,33 @@ Contains common GUI utilities and styling functions
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext
-import os
+from typing import cast, Protocol
 import sys
 import queue
 from datetime import datetime
 from pathlib import Path
 from PIL import Image
 import ctypes
-import platform
+import ttkbootstrap as ttkb
+from ttkbootstrap.constants import SECONDARY
+
+
+class ColorsProto(Protocol):
+    bg: str
+    fg: str
+    primary: str
+    secondary: str
+    success: str
+    info: str
+    warning: str
+    danger: str
+    light: str
+    dark: str
+    inputbg: str
+    inputfg: str
+    selectbg: str
+    selectfg: str
+    border: str
 
 
 class WindowManager:
@@ -119,7 +138,7 @@ class WindowManager:
         if theme_manager is None:
             raise ValueError("ThemeManager is required for create_modern_section")
             
-        colors = theme_manager.style.colors
+        colors = cast(ColorsProto, theme_manager.style.colors)
         
         # Use theme-aware colors
         card_bg = colors.inputbg  # Subtle background for sections
@@ -152,16 +171,71 @@ class WindowManager:
 
     @staticmethod
     def bind_mousewheel(widget, scrollbar):
-        """Bind mouse wheel to scrollable widget"""
+        """Bind mouse wheel to a scrollable widget (Canvas/ScrolledFrame/Text) cross-platform.
+        Note: scrollbar is unused but kept for backward compatibility.
+        """
+        # Determine the actual widget that supports yview_scroll
+        scroll_target = widget
+        # ttkbootstrap ScrolledFrame exposes a private canvas attribute
+        canvas = getattr(widget, "_canvas", None)
+        if canvas is not None and hasattr(canvas, "yview_scroll"):
+            scroll_target = canvas
+            try:
+                # Smaller increment per unit for smoother scrolling
+                scroll_target.configure(yscrollincrement=5)
+            except Exception:
+                pass
+
         def _on_mousewheel(event):
-            widget.yview_scroll(int(-1*(event.delta/120)), "units")
-        
+            # Windows/macOS: event.delta is typically in multiples of 120 per notch on wheels,
+            # and small/frequent deltas on touchpads. Convert to unit steps with smoothing.
+            delta = event.delta or 0
+            if delta == 0:
+                return
+            # 120 -> ~3 units, 60 -> ~2 units, small deltas -> at least 1 unit
+            units = int(-delta / 40)
+            if units == 0:
+                units = -1 if delta > 0 else 1
+            try:
+                scroll_target.yview_scroll(units, "units")
+            except Exception:
+                pass
+
+        def _on_linux_scroll_up(event):
+            try:
+                scroll_target.yview_scroll(-1, "units")
+            except Exception:
+                pass
+
+        def _on_linux_scroll_down(event):
+            try:
+                scroll_target.yview_scroll(1, "units")
+            except Exception:
+                pass
+
         def _bind_to_mousewheel(event):
-            widget.bind_all("<MouseWheel>", _on_mousewheel)
-        
+            # Bind only on the scroll target to avoid duplicate bindings and jitter
+            try:
+                scroll_target.bind("<MouseWheel>", _on_mousewheel)
+                # Linux (X11)
+                scroll_target.bind("<Button-4>", _on_linux_scroll_up)
+                scroll_target.bind("<Button-5>", _on_linux_scroll_down)
+            except Exception:
+                # Fallback to widget-level if needed
+                widget.bind("<MouseWheel>", _on_mousewheel)
+                widget.bind("<Button-4>", _on_linux_scroll_up)
+                widget.bind("<Button-5>", _on_linux_scroll_down)
+
         def _unbind_from_mousewheel(event):
-            widget.unbind_all("<MouseWheel>")
-        
+            try:
+                scroll_target.unbind("<MouseWheel>")
+                scroll_target.unbind("<Button-4>")
+                scroll_target.unbind("<Button-5>")
+            except Exception:
+                widget.unbind("<MouseWheel>")
+                widget.unbind("<Button-4>")
+                widget.unbind("<Button-5>")
+
         widget.bind('<Enter>', _bind_to_mousewheel)
         widget.bind('<Leave>', _unbind_from_mousewheel)
 
@@ -178,7 +252,7 @@ class LogManager:
     def update_color_map(self):
         """Update color map based on current theme"""
         if self.theme_manager:
-            colors = self.theme_manager.style.colors
+            colors = cast(ColorsProto, self.theme_manager.style.colors)
             self.color_map = {
                 "INFO": colors.inputfg,
                 "SUCCESS": colors.success,
@@ -268,9 +342,11 @@ class NavigationManager:
             logo_path = project_root / 'assets' / 'LogoIcon.png'
             if logo_path.exists():
                 logo_image = tk.PhotoImage(file=str(logo_path))
-                logo_image = logo_image.subsample(6, 6)
+                # Use single-arg subsample to satisfy some type stubs and scale both axes equally
+                logo_image = logo_image.subsample(6)
                 logo_label = ttkb.Label(title_frame, image=logo_image)
-                logo_label.image = logo_image
+                # Keep a reference on the instance to prevent garbage collection
+                self.logo_image = logo_image
                 logo_label.pack(pady=(0, 12))
             else:
                 raise FileNotFoundError("Logo not found")
@@ -334,8 +410,6 @@ class NavigationManager:
         self.theme_manager.toggle_theme()
         icon = "🌙" if self.theme_manager.current_theme in self.theme_manager.light_themes else "☀️"
         self.theme_button.configure(text=icon)
-import ttkbootstrap as ttkb
-from ttkbootstrap.constants import *
 
 class ThemeManager:
     """Manages theme switching and palette access"""
@@ -351,7 +425,7 @@ class ThemeManager:
 
     def configure_custom_styles(self):
         """Configure custom styles with theme-aware properties"""
-        colors = self.style.colors
+        colors = cast(ColorsProto, self.style.colors)
         
         # Reconfigure common styles
         self.style.configure('TFrame', padding=10)
@@ -395,7 +469,7 @@ class ThemeManager:
 
     def get_color(self, color_type):
         """Get theme-aware color"""
-        colors = self.style.colors
+        colors = cast(ColorsProto, self.style.colors)
         color_map = {
             'bg': colors.bg,
             'fg': colors.fg,
@@ -427,7 +501,7 @@ class ThemeManager:
 
     def refresh_widget(self, widget):
         """Refresh a single widget's colors based on type"""
-        colors = self.style.colors
+        colors = cast(ColorsProto, self.style.colors)
         if isinstance(widget, tk.Canvas):
             widget.configure(bg=colors.bg, highlightbackground=colors.border)
         elif isinstance(widget, tk.Text) or isinstance(widget, scrolledtext.ScrolledText):

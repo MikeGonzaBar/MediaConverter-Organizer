@@ -4,10 +4,9 @@ Contains reusable UI components and page creators
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-from datetime import datetime
-import queue
+from tkinter import ttk, filedialog
 import threading
+from src.gui_utils import WindowManager
 
 
 class TooltipManager:
@@ -49,7 +48,6 @@ class MediaOrganizerPage:
     
     def create_page(self):
         """Create the Media Organizer page"""
-        from src.gui_utils import WindowManager
         
         page = ttk.Frame(self.parent, style='Content.TFrame')
         
@@ -59,6 +57,11 @@ class MediaOrganizerPage:
         
         # Create scrollable content
         canvas = tk.Canvas(page, bg='#202020', highlightthickness=0, borderwidth=0)
+        # Smaller scroll increment for smoother movement
+        try:
+            canvas.configure(yscrollincrement=5)
+        except Exception:
+            pass
         scrollbar = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style='Content.TFrame')
         
@@ -128,7 +131,6 @@ class MediaOrganizerPage:
         scrollbar.pack(side="right", fill="y")
         
         # Bind mouse wheel to canvas
-        from src.gui_utils import WindowManager
         WindowManager.bind_mousewheel(canvas, scrollbar)
         
         return page
@@ -244,6 +246,11 @@ class WAVConverterPage:
         
         # Create scrollable content
         canvas = tk.Canvas(page, bg='#202020', highlightthickness=0, borderwidth=0)
+        # Smaller scroll increment for smoother movement
+        try:
+            canvas.configure(yscrollincrement=5)
+        except Exception:
+            pass
         scrollbar = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style='Content.TFrame')
         
@@ -362,7 +369,6 @@ class WAVConverterPage:
         scrollbar.pack(side="right", fill="y")
         
         # Bind mouse wheel to canvas
-        from src.gui_utils import WindowManager
         WindowManager.bind_mousewheel(canvas, scrollbar)
         
         # Initial visibility for source inputs (toggle frames/labels, not inner widgets)

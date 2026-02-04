@@ -6,17 +6,24 @@ This script recursively scans a directory for images and organizes them by year 
 For debugging purposes, it prints the files that would be moved without actually moving them.
 """
 
-import os
 import sys
 import argparse
+from typing import Any, Optional, Dict, cast
 from datetime import datetime
 from pathlib import Path
 import mimetypes
+# Support running as a script (from repo root) and as a module (python -m src.image_organizer)
+try:
+    from common.date_utils import get_month_name, build_year_month_dir
+    from common.logging_utils import default_log
+except ImportError:  # pragma: no cover - fallback for different invocation contexts
+    from src.common.date_utils import get_month_name, build_year_month_dir
+    from src.common.logging_utils import default_log
 
 # Try to import Pillow for EXIF data extraction
+PILImage: Any = None
 try:
-    from PIL import Image
-    from PIL.ExifTags import TAGS
+    from PIL import Image as PILImage  # type: ignore
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
@@ -62,27 +69,63 @@ def get_exif_date(image_path):
         return None
     
     try:
-        with Image.open(image_path) as img:
-            # Get EXIF data
-            exif_data = img._getexif()
+        with PILImage.open(image_path) as img:  # type: ignore[call-arg]
+            # Get EXIF data using safe access compatible with different Pillow versions
+            exif_data: Optional[Dict[int, Any]] = None
+
+            # Prefer public getexif() when available
+            try:
+                getexif = getattr(img, "getexif", None)
+                if callable(getexif):
+                    exif = getexif()
+                    if exif:
+                        # Prefer .items() if available to satisfy typing; otherwise handle dict directly
+                        items_method = getattr(exif, "items", None)
+                        if callable(items_method):
+                            try:
+                                exif_items_any = cast(Any, exif).items()
+                                exif_data = {int(k): v for k, v in exif_items_any}
+                            except Exception:
+                                exif_data = None
+                        elif isinstance(exif, dict):
+                            try:
+                                exif_data = {int(k): v for k, v in exif.items()}
+                            except Exception:
+                                exif_data = None
+            except Exception:
+                exif_data = None
+
+            # Fallback to legacy _getexif() when necessary
             if exif_data is None:
+                legacy = getattr(img, "_getexif", None)
+                if callable(legacy):
+                    try:
+                        legacy_data = legacy()
+                        if isinstance(legacy_data, dict):
+                            exif_data = {int(k): v for k, v in legacy_data.items()}
+                        else:
+                            exif_data = None
+                    except Exception:
+                        exif_data = None
+
+            if not exif_data:
                 return None
-            
+
             # Look for DateTimeOriginal (36867) or DateTime (306)
             date_tags = [36867, 306, 50971]  # DateTimeOriginal, DateTime, DateTimeDigitized
-            
+
             for tag_id in date_tags:
                 if tag_id in exif_data:
                     date_str = exif_data[tag_id]
                     try:
                         # Parse EXIF date format: "YYYY:MM:DD HH:MM:SS"
-                        return datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+                        return datetime.strptime(str(date_str), "%Y:%m:%d %H:%M:%S")
                     except ValueError:
                         continue
-            
+
             return None
-            
-    except Exception as e:
+
+    except Exception:
         # Silently fail and return None - will fall back to file system date
         return None
 
@@ -100,11 +143,39 @@ def get_exif_data(image_path):
         return None
     
     try:
-        with Image.open(image_path) as img:
-            # Get EXIF data
-            exif_data = img._getexif()
-            return exif_data
-    except Exception as e:
+        with PILImage.open(image_path) as img:  # type: ignore[call-arg]
+            # Get EXIF data using safe access for different Pillow versions
+            try:
+                getexif = getattr(img, "getexif", None)
+                if callable(getexif):
+                    exif = getexif()
+                    if exif:
+                        items_method = getattr(exif, "items", None)
+                        if callable(items_method):
+                            try:
+                                exif_items_any = cast(Any, exif).items()
+                                return {int(k): v for k, v in exif_items_any}
+                            except Exception:
+                                pass
+                        elif isinstance(exif, dict):
+                            try:
+                                return {int(k): v for k, v in exif.items()}
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
+            legacy = getattr(img, "_getexif", None)
+            if callable(legacy):
+                try:
+                    legacy_data = legacy()
+                    if isinstance(legacy_data, dict):
+                        return {int(k): v for k, v in legacy_data.items()}
+                    return None
+                except Exception:
+                    return None
+            return None
+    except Exception:
         # Silently fail and return None
         return None
 
@@ -194,21 +265,7 @@ def get_file_date(file_path):
         print(f"Warning: Could not get date for {file_path}, using current date")
         return datetime.now()
 
-def get_month_name(month_number):
-    """
-    Get the month name from month number.
-    
-    Args:
-        month_number (int): Month number (1-12)
-        
-    Returns:
-        str: Month name
-    """
-    month_names = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ]
-    return month_names[month_number - 1]
+## get_month_name is provided by common.date_utils
 
 def scan_and_organize_images(source_dir):
     """
@@ -270,7 +327,7 @@ def scan_and_organize_images(source_dir):
                 
                 # Create target directory structure
                 month_name = get_month_name(month)
-                target_dir = source_dir / str(year) / f"{month:02d}-{month_name}"
+                target_dir = build_year_month_dir(source_dir, year, month)
                 
                 # Create target file path
                 target_file = target_dir / file_path.name
@@ -417,11 +474,7 @@ class ImageOrganizer:
         """
         self.directory = Path(directory)
         self.mode = mode
-        self.log_callback = log_callback or self._default_log
-    
-    def _default_log(self, message, level="INFO"):
-        """Default logging function that prints to console"""
-        print(f"[{level}] {message}")
+        self.log_callback = log_callback or default_log
     
     def organize_images(self):
         """Organize images based on the specified mode"""
@@ -507,7 +560,7 @@ class ImageOrganizer:
                     
                     # Create target directory structure
                     month_name = get_month_name(month)
-                    target_dir = self.directory / str(year) / f"{month:02d}-{month_name}"
+                    target_dir = build_year_month_dir(self.directory, year, month)
                     
                     # Create target file path
                     target_file = target_dir / file_path.name

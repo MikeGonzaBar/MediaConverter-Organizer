@@ -7,19 +7,22 @@ based on their metadata and current path structure. It can print files that are 
 and optionally move them to their proper organized locations.
 """
 
-import os
 import sys
 import argparse
 import shutil
 from datetime import datetime
 from pathlib import Path
 import mimetypes
-import subprocess
-import json
+from typing import Any
+from common.date_utils import get_month_name, build_year_month_dir
+from common.logging_utils import default_log
 
 # Try to import ffprobe for video metadata extraction
+# Ensure symbol 'ffmpeg' is always bound to satisfy type checkers
+ffmpeg: Any = None
 try:
-    import ffmpeg
+    import ffmpeg as _ffmpeg
+    ffmpeg = _ffmpeg  # type: ignore[assignment]
     FFMPEG_AVAILABLE = True
 except ImportError:
     FFMPEG_AVAILABLE = False
@@ -134,21 +137,7 @@ def get_file_date(file_path):
     # No metadata found - return None
     return None
 
-def get_month_name(month_number):
-    """
-    Get the month name from month number.
-    
-    Args:
-        month_number (int): Month number (1-12)
-        
-    Returns:
-        str: Month name
-    """
-    month_names = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ]
-    return month_names[month_number - 1]
+## get_month_name is provided by common.date_utils
 
 def is_already_organized(file_path, source_dir):
     """
@@ -171,9 +160,8 @@ def is_already_organized(file_path, source_dir):
         year = file_date.year
         month = file_date.month
         
-        # Create expected organized path
-        month_name = get_month_name(month)
-        expected_dir = source_dir / str(year) / f"{month:02d}-{month_name}"
+        # Create expected organized path using shared utility
+        expected_dir = build_year_month_dir(source_dir, year, month)
         expected_path = expected_dir / file_path.name
         
         # Check if the file is already in the expected location
@@ -202,8 +190,7 @@ def get_expected_path(file_path, source_dir):
     year = file_date.year
     month = file_date.month
     
-    month_name = get_month_name(month)
-    expected_dir = source_dir / str(year) / f"{month:02d}-{month_name}"
+    expected_dir = build_year_month_dir(source_dir, year, month)
     return expected_dir / file_path.name
 
 def move_video_file(file_info, dry_run=False):
@@ -426,11 +413,7 @@ class VideoOrganizer:
         """
         self.directory = Path(directory)
         self.mode = mode
-        self.log_callback = log_callback or self._default_log
-    
-    def _default_log(self, message, level="INFO"):
-        """Default logging function that prints to console"""
-        print(f"[{level}] {message}")
+        self.log_callback = log_callback or default_log
     
     def organize_videos(self):
         """Organize videos based on the specified mode"""

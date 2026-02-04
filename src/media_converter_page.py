@@ -88,6 +88,11 @@ class MediaConverterPage:
         from ttkbootstrap.scrolled import ScrolledFrame
         scrollable_frame = ScrolledFrame(page, autohide=True, bootstyle="dark")
         scrollable_frame.pack(fill=tk.BOTH, expand=True)
+        # Ensure mouse wheel scrolling works across platforms
+        try:
+            WindowManager.bind_mousewheel(scrollable_frame, None)
+        except Exception:
+            pass
         
         # Input/Output Selection Card - Modern Windows 11 style
         io_card, io_content = WindowManager.create_modern_section(scrollable_frame, "📂 Input & Output", theme_manager=self.theme_manager)

@@ -42,10 +42,11 @@ from mutagen.flac import FLAC
 import musicbrainzngs
 import acoustid
 import pylast
+from typing import List, Tuple, Dict, Optional, Set, Any, cast
 import logging
-from typing import List, Tuple, Dict, Optional, Set
-from urllib.parse import quote
+import subprocess
 from difflib import SequenceMatcher
+import pylast
 
 # Load environment variables from .env file
 try:
@@ -216,7 +217,6 @@ class AdvancedMetadataLookup:
             
             # Check if fpcalc is available
             try:
-                import subprocess
                 result = subprocess.run(['fpcalc', '--version'], capture_output=True, text=True, timeout=5)
                 # fpcalc returns error code 1 for --version but that's normal, just check if it runs
             except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
@@ -804,7 +804,8 @@ class AdvancedMetadataLookup:
                 try:
                     # Try to get track info first
                     track_title = track.get_name()
-                    track_artist = track.get_artist().get_name() if track.get_artist() else artist
+                    artist_obj = track.get_artist()
+                    track_artist = artist_obj.get_name() if artist_obj else artist
                     track_url = track.get_url()
                     
                     metadata = {
@@ -846,9 +847,17 @@ class AdvancedMetadataLookup:
                         time.sleep(0.2)
                         tags = track.get_top_tags(limit=3)
                         if tags:
-                            genre_list = [tag.item.get_name() for tag in tags]
-                            if genre_list:
-                                metadata['genre'] = ', '.join(genre_list)
+                            names: List[str] = []
+                            for tag in tags:
+                                try:
+                                    item = getattr(tag, 'item', None)
+                                    name = item.get_name() if item else None
+                                    if name:
+                                        names.append(str(name))
+                                except Exception:
+                                    continue
+                            if names:
+                                metadata['genre'] = ', '.join(names)
                                 logger.info(f"  [LASTFM] Found genres: {metadata['genre']}")
                     except pylast.WSError as e:
                         if "400" in str(e):
@@ -888,7 +897,8 @@ class AdvancedMetadataLookup:
                     track = self.lastfm_network.get_track(corrected_artist, title)
                     
                     track_title = track.get_name()
-                    track_artist = track.get_artist().get_name() if track.get_artist() else corrected_artist
+                    artist_obj2 = track.get_artist()
+                    track_artist = artist_obj2.get_name() if artist_obj2 else corrected_artist
                     
                     metadata = {
                         'title': track_title or title,
@@ -1134,7 +1144,7 @@ class EnhancedWAVToFLACConverter:
                     album=dir_metadata['album'],
                     title=dir_metadata['title'],
                     track_number=track_number,
-                    is_generic=dir_metadata.get('is_generic', False),
+                    is_generic=cast(bool, dir_metadata.get('is_generic', False)),
                     file_path=audio_file,  # Use original file for fingerprinting
                     existing_metadata=existing_metadata
                 )
