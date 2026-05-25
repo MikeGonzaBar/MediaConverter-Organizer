@@ -4,6 +4,9 @@ This project keeps executable entry points in the root and support scripts in `s
 
 ```text
 MediaConverter-Organizer/
+|-- .github/
+|   `-- workflows/
+|       `-- windows-release.yml
 |-- main.py
 |-- requirements.txt
 |-- README.md
@@ -63,6 +66,10 @@ MediaConverter-Organizer/
 - `setup.bat` / `setup.sh`: platform setup scripts.
 - `run_gui.bat` / `run_gui.sh`: platform launch scripts.
 - `fix_pip_corruption.bat` / `fix_pip_corruption.sh`: cleanup helpers for broken local pip metadata.
+
+`.github/workflows/` contains CI and release automation:
+
+- `windows-release.yml`: runs tests, builds the Windows PyInstaller executable, uploads the ZIP artifact, and creates a GitHub Release for version tags or manual runs with `release_tag`.
 
 `docs/` contains task-specific documentation:
 

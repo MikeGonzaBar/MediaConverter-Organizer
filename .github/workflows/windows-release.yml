@@ -1,0 +1,131 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional release tag to create or update, for example v1.0.0. Leave empty for an artifact-only build."
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows executable
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Run regression checks
+        run: |
+          python -m unittest discover -s tests -v
+          python -m compileall -q src tests
+
+      - name: Set package metadata
+        run: |
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $refType = "${{ github.ref_type }}"
+          $refName = "${{ github.ref_name }}"
+          $dispatchTag = "${{ github.event.inputs.release_tag }}"
+
+          if ([string]::IsNullOrWhiteSpace($dispatchTag)) {
+            if ($refType -eq "tag") {
+              $releaseTag = $refName
+            } else {
+              $releaseTag = ""
+            }
+          } else {
+            $releaseTag = $dispatchTag.Trim()
+          }
+
+          if ([string]::IsNullOrWhiteSpace($releaseTag)) {
+            $packageVersion = "dev-$shortSha"
+          } else {
+            $packageVersion = $releaseTag
+          }
+
+          "RELEASE_TAG=$releaseTag" >> $env:GITHUB_ENV
+          "PACKAGE_VERSION=$packageVersion" >> $env:GITHUB_ENV
+          "PACKAGE_NAME=MediaConverterOrganizer-Windows-$packageVersion" >> $env:GITHUB_ENV
+
+      - name: Build executable with PyInstaller
+        run: |
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --windowed `
+            --onedir `
+            --name "MediaConverterOrganizer" `
+            --icon "assets\LogoIcon.ico" `
+            --add-data "assets;assets" `
+            --hidden-import "PIL._tkinter_finder" `
+            main.py
+
+          $exePath = "dist\MediaConverterOrganizer\MediaConverterOrganizer.exe"
+          if (!(Test-Path $exePath)) {
+            throw "Expected executable was not created: $exePath"
+          }
+
+      - name: Package release ZIP
+        run: |
+          $packageRoot = "release\$env:PACKAGE_NAME"
+          New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
+
+          Copy-Item -Path "dist\MediaConverterOrganizer\*" -Destination $packageRoot -Recurse
+          Copy-Item -Path "README.md", "LICENSE", "requirements.txt" -Destination $packageRoot
+          Copy-Item -Path "docs" -Destination "$packageRoot\docs" -Recurse
+
+          @"
+          Media Converter & Organizer $env:PACKAGE_VERSION
+
+          Run:
+            MediaConverterOrganizer.exe
+
+          Notes:
+          - FFmpeg is not bundled. Install it separately and keep it in PATH for audio/video conversion.
+          - Chromaprint/fpcalc is not bundled. Install it separately for AcoustID fingerprinting.
+          - Optional API keys can be provided with environment variables or a .env file next to the executable.
+          "@ | Set-Content -Path "$packageRoot\RUNNING_THIS_BUILD.txt" -Encoding UTF8
+
+          $zipPath = "release\$env:PACKAGE_NAME.zip"
+          Compress-Archive -Path "$packageRoot\*" -DestinationPath $zipPath -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}
+          path: release/${{ env.PACKAGE_NAME }}.zip
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        if: ${{ startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: release/${{ env.PACKAGE_NAME }}.zip

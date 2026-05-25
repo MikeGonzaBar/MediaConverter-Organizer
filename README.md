@@ -252,10 +252,26 @@ git diff --check
 
 The unittest suite includes optional FFmpeg smoke tests that skip cleanly when FFmpeg is unavailable.
 
+## GitHub Release Builds
+
+The repository includes a Windows release workflow at `.github/workflows/windows-release.yml`.
+
+It can be run two ways:
+
+- Push a version tag such as `v1.0.0`. The workflow builds the app, uploads the ZIP artifact, and creates a GitHub Release.
+- Run "Build Windows EXE" manually from the GitHub Actions tab. Leave `release_tag` empty for an artifact-only build, or provide a tag like `v1.0.0` to create/update a release.
+
+The workflow builds a PyInstaller one-folder app named `MediaConverterOrganizer.exe`, uses `assets/LogoIcon.ico` for the executable icon, includes the `assets/` folder in the bundle, and packages the result as `MediaConverterOrganizer-Windows-<version>.zip`.
+
+FFmpeg and Chromaprint are intentionally not bundled. Install them separately and keep them in `PATH` on the target machine.
+
 ## Project Layout
 
 ```text
 MediaConverter-Organizer/
+|-- .github/
+|   `-- workflows/
+|       `-- windows-release.yml
 |-- main.py
 |-- requirements.txt
 |-- README.md
