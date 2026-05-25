@@ -7,13 +7,19 @@ REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python is not installed or not in PATH
-    echo Please install Python 3.7+ from https://python.org
+    echo Please install Python 3.10+ from https://python.org
     pause
     exit /b 1
 )
 
 echo Python found. Checking version...
 python --version
+python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
+if errorlevel 1 (
+    echo ERROR: Python 3.10+ is required
+    pause
+    exit /b 1
+)
 
 REM Remove existing virtual environment if it exists
 if exist ".venv" (
@@ -27,7 +33,7 @@ if exist ".venv" (
         echo Please try one of the following:
         echo 1. Run this script as Administrator
         echo 2. Manually delete the .venv folder
-        echo 3. Run cleanup_venv.ps1 script
+        echo 3. Run scripts\fix_pip_corruption.bat if pip metadata is corrupted
         echo.
         echo Attempting to continue with existing .venv...
     ) else (

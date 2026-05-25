@@ -7,7 +7,14 @@ REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python is not installed or not in PATH
-    echo Please install Python 3.7+ from https://python.org
+    echo Please install Python 3.10+ from https://python.org
+    pause
+    exit /b 1
+)
+
+python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
+if errorlevel 1 (
+    echo ERROR: Python 3.10+ is required
     pause
     exit /b 1
 )

@@ -11,9 +11,9 @@ import platform
 from pathlib import Path
 
 def check_python_version():
-    """Check if Python version is 3.7+"""
-    if sys.version_info < (3, 7):
-        print("ERROR: Python 3.7+ is required")
+    """Check if Python version is 3.10+"""
+    if sys.version_info < (3, 10):
+        print("ERROR: Python 3.10+ is required")
         print(f"Current version: {sys.version}")
         return False
     return True

@@ -45,6 +45,8 @@ class MediaOrganizerPage:
         self.log_callback = log_callback
         self.organize_mode_var = tk.StringVar(value="check")
         self.media_dir_var = tk.StringVar()
+        self.organization_cancel_event = threading.Event()
+        self.status_var = tk.StringVar(value="Ready")
     
     def create_page(self):
         """Create the Media Organizer page"""
@@ -53,8 +55,8 @@ class MediaOrganizerPage:
         page = ttk.Frame(self.parent, style='Content.TFrame')
         
         # Page title
-        title_label = ttk.Label(page, text="📁 Media Organizer", style='Title.TLabel')
-        title_label.pack(pady=(0, 30))
+        title_label = ttk.Label(page, text="Media Organizer", style='Title.TLabel')
+        title_label.pack(anchor=tk.W, pady=(0, 24))
         
         # Create scrollable content
         canvas = tk.Canvas(page, bg='#202020', highlightthickness=0, borderwidth=0)
@@ -66,14 +68,15 @@ class MediaOrganizerPage:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(canvas_window, width=e.width))
         
         # Directory Selection Card - Use same helper as Media Converter
-        dir_card, content_frame = WindowManager.create_modern_section(scrollable_frame, "📂 Directory Selection")
+        dir_card, content_frame = WindowManager.create_modern_section(scrollable_frame, "Directory")
         dir_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
-        ttk.Label(content_frame, text="📁 Media Directory:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 10))
+        ttk.Label(content_frame, text="Media Directory:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 10))
         
         dir_frame = ttk.Frame(content_frame)
         dir_frame.pack(fill=tk.X, pady=(0, 0))
@@ -81,18 +84,18 @@ class MediaOrganizerPage:
         dir_entry = ttk.Entry(dir_frame, textvariable=self.media_dir_var, width=60, font=('Segoe UI', 10))
         dir_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        browse_btn = WindowManager.create_gray_button(dir_frame, text="📁 Browse", command=self.browse_media_directory)
+        browse_btn = WindowManager.create_gray_button(dir_frame, text="Browse", command=self.browse_media_directory)
         browse_btn.pack(side=tk.RIGHT)
         
         # Operation Mode Card - Use same helper as Media Converter
-        mode_card, mode_content_frame = WindowManager.create_modern_section(scrollable_frame, "⚙️ Operation Mode")
+        mode_card, mode_content_frame = WindowManager.create_modern_section(scrollable_frame, "Operation Mode")
         mode_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Check Only option
         check_frame = ttk.Frame(mode_content_frame)
         check_frame.pack(fill=tk.X, pady=(0, 10))
         
-        check_radio = ttk.Radiobutton(check_frame, text="🔍 Check Only", variable=self.organize_mode_var, value="check")
+        check_radio = ttk.Radiobutton(check_frame, text="Check Only", variable=self.organize_mode_var, value="check")
         check_radio.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(check_radio, "Only analyze files and show what would be organized without making any changes")
         
@@ -100,7 +103,7 @@ class MediaOrganizerPage:
         dry_run_frame = ttk.Frame(mode_content_frame)
         dry_run_frame.pack(fill=tk.X, pady=(0, 10))
         
-        dry_run_radio = ttk.Radiobutton(dry_run_frame, text="🧪 Dry Run", variable=self.organize_mode_var, value="dry_run")
+        dry_run_radio = ttk.Radiobutton(dry_run_frame, text="Dry Run", variable=self.organize_mode_var, value="dry_run")
         dry_run_radio.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(dry_run_radio, "Simulate the organization process and show detailed logs without actually moving files")
         
@@ -108,19 +111,25 @@ class MediaOrganizerPage:
         move_frame = ttk.Frame(mode_content_frame)
         move_frame.pack(fill=tk.X, pady=(0, 0))
         
-        move_radio = ttk.Radiobutton(move_frame, text="🚀 Actually Move Files", variable=self.organize_mode_var, value="move")
+        move_radio = ttk.Radiobutton(move_frame, text="Actually Move Files", variable=self.organize_mode_var, value="move")
         move_radio.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(move_radio, "Actually organize files by moving them to appropriate folders based on their metadata")
         
-        # Action Card - Use same helper as Media Converter
-        action_card, action_content_frame = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
-        action_card.pack(fill=tk.X, pady=(0, 24), padx=0)
-        
-        self.start_btn = WindowManager.create_gray_button(action_content_frame, text="🚀 Start Organization", command=self.start_organization)
-        self.start_btn.pack(side=tk.LEFT, padx=(0, 15))
-        
-        self.stop_btn = WindowManager.create_gray_button(action_content_frame, text="⏹️ Stop", command=self.stop_organization, state=tk.DISABLED)
-        self.stop_btn.pack(side=tk.LEFT)
+        footer = tk.Frame(page, bg='#252525', highlightthickness=1, highlightbackground='#3D3D3D')
+        footer.pack(side=tk.BOTTOM, fill=tk.X, pady=(12, 0))
+        tk.Label(
+            footer,
+            textvariable=self.status_var,
+            font=('Segoe UI', 10),
+            bg='#252525',
+            fg='#C0C0C0',
+            anchor='w',
+        ).pack(side=tk.LEFT, padx=14, pady=10, fill=tk.X, expand=True)
+        self.start_btn = WindowManager.create_gray_button(footer, text="Start Organization", command=self.start_organization)
+        self.start_btn.pack(side=tk.RIGHT, padx=(8, 14), pady=8)
+
+        self.stop_btn = WindowManager.create_gray_button(footer, text="Stop", command=self.stop_organization, state=tk.DISABLED)
+        self.stop_btn.pack(side=tk.RIGHT, pady=8)
         
         # Pack canvas and scrollbar
         canvas.pack(side="left", fill="both", expand=True)
@@ -147,6 +156,8 @@ class MediaOrganizerPage:
         # Update button states
         self.start_btn.configure(state=tk.DISABLED)
         self.stop_btn.configure(state=tk.NORMAL)
+        self.status_var.set("Running organization...")
+        self.organization_cancel_event = threading.Event()
         
         # Start organization in a separate thread
         self.organization_thread = threading.Thread(target=self.run_organization)
@@ -167,11 +178,11 @@ class MediaOrganizerPage:
                 from src.video_organizer import VideoOrganizer
                 
                 # Check images
-                img_organizer = ImageOrganizer(directory, mode="check", log_callback=self.log_callback)
+                img_organizer = ImageOrganizer(directory, mode="check", log_callback=self.log_callback, cancel_event=self.organization_cancel_event)
                 img_organizer.organize_images()
                 
                 # Check videos
-                vid_organizer = VideoOrganizer(directory, mode="check", log_callback=self.log_callback)
+                vid_organizer = VideoOrganizer(directory, mode="check", log_callback=self.log_callback, cancel_event=self.organization_cancel_event)
                 vid_organizer.organize_videos()
                 
             elif mode == "dry_run":
@@ -179,11 +190,11 @@ class MediaOrganizerPage:
                 from src.video_organizer import VideoOrganizer
                 
                 # Dry run images
-                img_organizer = ImageOrganizer(directory, mode="dry_run", log_callback=self.log_callback)
+                img_organizer = ImageOrganizer(directory, mode="dry_run", log_callback=self.log_callback, cancel_event=self.organization_cancel_event)
                 img_organizer.organize_images()
                 
                 # Dry run videos
-                vid_organizer = VideoOrganizer(directory, mode="dry_run", log_callback=self.log_callback)
+                vid_organizer = VideoOrganizer(directory, mode="dry_run", log_callback=self.log_callback, cancel_event=self.organization_cancel_event)
                 vid_organizer.organize_videos()
                 
             elif mode == "move":
@@ -191,17 +202,19 @@ class MediaOrganizerPage:
                 from src.video_organizer import VideoOrganizer
                 
                 # Actually organize images
-                img_organizer = ImageOrganizer(directory, mode="move", log_callback=self.log_callback)
+                img_organizer = ImageOrganizer(directory, mode="move", log_callback=self.log_callback, cancel_event=self.organization_cancel_event)
                 img_organizer.organize_images()
                 
                 # Actually organize videos
-                vid_organizer = VideoOrganizer(directory, mode="move", log_callback=self.log_callback)
+                vid_organizer = VideoOrganizer(directory, mode="move", log_callback=self.log_callback, cancel_event=self.organization_cancel_event)
                 vid_organizer.organize_videos()
             
             self.log_callback("Media organization completed successfully", "SUCCESS")
+            self.status_var.set("Completed")
             
         except Exception as e:
             self.log_callback(f"Media organization failed: {str(e)}", "ERROR")
+            self.status_var.set("Failed")
         finally:
             # Update button states
             self.parent.after(0, lambda: self.start_btn.configure(state=tk.NORMAL))
@@ -210,8 +223,8 @@ class MediaOrganizerPage:
     def stop_organization(self):
         """Stop media organization process"""
         self.log_callback("Media organization stop requested", "WARNING")
-        # Update button states
-        self.start_btn.configure(state=tk.NORMAL)
+        self.status_var.set("Stop requested...")
+        self.organization_cancel_event.set()
         self.stop_btn.configure(state=tk.DISABLED)
 
 
@@ -231,14 +244,18 @@ class WAVConverterPage:
         self.quality_var = tk.StringVar(value="high")
         self.metadata_var = tk.BooleanVar(value=True)
         self.fingerprint_var = tk.BooleanVar(value=False)
+        self.conversion_cancel_event = threading.Event()
+        self.status_var = tk.StringVar(value="Ready")
     
     def create_page(self):
         """Create the WAV to FLAC Converter page"""
+        from src.gui_utils import WindowManager
+
         page = ttk.Frame(self.parent, style='Content.TFrame')
         
         # Page title
-        title_label = ttk.Label(page, text="🎵 WAV to FLAC Converter", style='Title.TLabel')
-        title_label.pack(pady=(0, 30))
+        title_label = ttk.Label(page, text="WAV to FLAC Converter", style='Title.TLabel')
+        title_label.pack(anchor=tk.W, pady=(0, 24))
         
         # Create scrollable content
         canvas = tk.Canvas(page, bg='#202020', highlightthickness=0, borderwidth=0)
@@ -250,110 +267,117 @@ class WAVConverterPage:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(canvas_window, width=e.width))
         
         # Mode & Source Selection Card
-        dir_card = ttk.LabelFrame(scrollable_frame, text="📂 Source Selection", padding=20)
+        dir_card, dir_content = WindowManager.create_modern_section(scrollable_frame, "Source")
         dir_card.pack(fill=tk.X, pady=(0, 20))
         
         # Mode toggle (Directory vs Single File)
-        mode_frame = ttk.Frame(dir_card)
+        mode_frame = ttk.Frame(dir_content)
         mode_frame.pack(fill=tk.X, pady=(0, 10))
         
-        dir_mode_radio = ttk.Radiobutton(mode_frame, text="📁 Directory Mode", variable=self.input_mode_var, value="directory", command=self._update_source_visibility)
+        dir_mode_radio = ttk.Radiobutton(mode_frame, text="Directory Mode", variable=self.input_mode_var, value="directory", command=self._update_source_visibility)
         dir_mode_radio.pack(side=tk.LEFT, padx=(0, 15))
         
-        file_mode_radio = ttk.Radiobutton(mode_frame, text="🎵 Single File Mode", variable=self.input_mode_var, value="single", command=self._update_source_visibility)
+        file_mode_radio = ttk.Radiobutton(mode_frame, text="Single File Mode", variable=self.input_mode_var, value="single", command=self._update_source_visibility)
         file_mode_radio.pack(side=tk.LEFT)
         
-        dir_label = ttk.Label(dir_card, text="📁 WAV/FLAC Directory:", style='Info.TLabel')
+        dir_label = ttk.Label(dir_content, text="WAV/FLAC Directory:", style='Info.TLabel')
         dir_label.pack(anchor=tk.W, pady=(0, 10))
         
-        dir_frame = ttk.Frame(dir_card)
+        dir_frame = ttk.Frame(dir_content)
         dir_frame.pack(fill=tk.X, pady=(0, 0))
         
         dir_entry = ttk.Entry(dir_frame, textvariable=self.wav_dir_var, width=60, font=('Segoe UI', 10))
         dir_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        browse_btn = WindowManager.create_gray_button(dir_frame, text="📁 Browse", command=self.browse_wav_directory)
+        browse_btn = WindowManager.create_gray_button(dir_frame, text="Browse", command=self.browse_wav_directory)
         browse_btn.pack(side=tk.RIGHT)
 
         # Single file selection (hidden by default)
-        self.file_label = ttk.Label(dir_card, text="🎵 WAV/FLAC File:", style='Info.TLabel')
-        self.file_frame = ttk.Frame(dir_card)
+        self.file_label = ttk.Label(dir_content, text="WAV/FLAC File:", style='Info.TLabel')
+        self.file_frame = ttk.Frame(dir_content)
         
         self.file_entry = ttk.Entry(self.file_frame, textvariable=self.wav_file_var, width=60, font=('Segoe UI', 10))
         self.file_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        self.file_browse_btn = WindowManager.create_gray_button(self.file_frame, text="🎵 Browse File", command=self.browse_wav_file)
+        self.file_browse_btn = WindowManager.create_gray_button(self.file_frame, text="Browse File", command=self.browse_wav_file)
         self.file_browse_btn.pack(side=tk.RIGHT)
         
         # Output Directory Card
-        out_card = ttk.LabelFrame(scrollable_frame, text="📤 Output Directory", padding=20)
+        out_card, out_content = WindowManager.create_modern_section(scrollable_frame, "Output")
         out_card.pack(fill=tk.X, pady=(0, 20))
         
-        out_label = ttk.Label(out_card, text="📁 Target Directory:", style='Info.TLabel')
+        out_label = ttk.Label(out_content, text="Target Directory:", style='Info.TLabel')
         out_label.pack(anchor=tk.W, pady=(0, 10))
         
-        out_frame = ttk.Frame(out_card)
+        out_frame = ttk.Frame(out_content)
         out_frame.pack(fill=tk.X)
         
         out_entry = ttk.Entry(out_frame, textvariable=self.output_dir_var, width=60, font=('Segoe UI', 10))
         out_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        out_browse_btn = WindowManager.create_gray_button(out_frame, text="📁 Browse", command=self.browse_output_directory)
+        out_browse_btn = WindowManager.create_gray_button(out_frame, text="Browse", command=self.browse_output_directory)
         out_browse_btn.pack(side=tk.RIGHT)
 
         # Quality Settings Card
-        quality_card = ttk.LabelFrame(scrollable_frame, text="⚙️ Quality Settings", padding=20)
+        quality_card, quality_content = WindowManager.create_collapsible_section(scrollable_frame, "Quality", expanded=True)
         quality_card.pack(fill=tk.X, pady=(0, 20))
         
         # High Quality option
-        high_frame = ttk.Frame(quality_card)
+        high_frame = ttk.Frame(quality_content)
         high_frame.pack(fill=tk.X, pady=(0, 10))
         
-        high_radio = ttk.Radiobutton(high_frame, text="🎵 High Quality", variable=self.quality_var, value="high")
+        high_radio = ttk.Radiobutton(high_frame, text="High Quality", variable=self.quality_var, value="high")
         high_radio.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(high_radio, "Best quality conversion with maximum compression efficiency")
         
         # Compatibility Mode option
-        compat_frame = ttk.Frame(quality_card)
+        compat_frame = ttk.Frame(quality_content)
         compat_frame.pack(fill=tk.X, pady=(0, 10))
         
-        compat_radio = ttk.Radiobutton(compat_frame, text="📱 Compatibility Mode", variable=self.quality_var, value="compatibility")
+        compat_radio = ttk.Radiobutton(compat_frame, text="Compatibility Mode", variable=self.quality_var, value="compatibility")
         compat_radio.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(compat_radio, "Optimized for maximum compatibility with older players and devices")
         
         # Metadata Options Card
-        metadata_card = ttk.LabelFrame(scrollable_frame, text="🏷️ Metadata Options", padding=20)
+        metadata_card, metadata_content = WindowManager.create_collapsible_section(scrollable_frame, "Metadata", expanded=True)
         metadata_card.pack(fill=tk.X, pady=(0, 20))
         
         # Aggressive metadata search
-        aggressive_frame = ttk.Frame(metadata_card)
+        aggressive_frame = ttk.Frame(metadata_content)
         aggressive_frame.pack(fill=tk.X, pady=(0, 10))
         
-        aggressive_check = ttk.Checkbutton(aggressive_frame, text="🔍 Aggressive metadata search", variable=self.metadata_var)
+        aggressive_check = ttk.Checkbutton(aggressive_frame, text="Aggressive metadata search", variable=self.metadata_var)
         aggressive_check.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(aggressive_check, "Search multiple databases for comprehensive metadata information")
         
         # Audio Fingerprinting
-        fingerprint_frame = ttk.Frame(metadata_card)
+        fingerprint_frame = ttk.Frame(metadata_content)
         fingerprint_frame.pack(fill=tk.X, pady=(0, 0))
         
-        fingerprint_check = ttk.Checkbutton(fingerprint_frame, text="🎵 Audio Fingerprinting", variable=self.fingerprint_var)
+        fingerprint_check = ttk.Checkbutton(fingerprint_frame, text="Audio Fingerprinting", variable=self.fingerprint_var)
         fingerprint_check.pack(side=tk.LEFT)
         TooltipManager.create_tooltip(fingerprint_check, "Use audio fingerprinting to identify songs and retrieve metadata")
         
-        # Action Card - Use same helper as Media Converter
-        action_card, action_content_frame = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
-        action_card.pack(fill=tk.X, pady=(0, 20))
-        
-        self.start_btn = WindowManager.create_gray_button(action_content_frame, text="🚀 Start Conversion", command=self.start_conversion)
-        self.start_btn.pack(side=tk.LEFT, padx=(0, 15))
-        
-        self.stop_btn = WindowManager.create_gray_button(action_content_frame, text="⏹️ Stop", command=self.stop_conversion, state=tk.DISABLED)
-        self.stop_btn.pack(side=tk.LEFT)
+        footer = tk.Frame(page, bg='#252525', highlightthickness=1, highlightbackground='#3D3D3D')
+        footer.pack(side=tk.BOTTOM, fill=tk.X, pady=(12, 0))
+        tk.Label(
+            footer,
+            textvariable=self.status_var,
+            font=('Segoe UI', 10),
+            bg='#252525',
+            fg='#C0C0C0',
+            anchor='w',
+        ).pack(side=tk.LEFT, padx=14, pady=10, fill=tk.X, expand=True)
+        self.start_btn = WindowManager.create_gray_button(footer, text="Start Conversion", command=self.start_conversion)
+        self.start_btn.pack(side=tk.RIGHT, padx=(8, 14), pady=8)
+
+        self.stop_btn = WindowManager.create_gray_button(footer, text="Stop", command=self.stop_conversion, state=tk.DISABLED)
+        self.stop_btn.pack(side=tk.RIGHT, pady=8)
         
         # Pack canvas and scrollbar
         canvas.pack(side="left", fill="both", expand=True)
@@ -451,6 +475,8 @@ class WAVConverterPage:
         # Update button states
         self.start_btn.configure(state=tk.DISABLED)
         self.stop_btn.configure(state=tk.NORMAL)
+        self.status_var.set("Running conversion...")
+        self.conversion_cancel_event = threading.Event()
         
         # Start conversion in a separate thread
         self.conversion_thread = threading.Thread(target=self.run_conversion)
@@ -497,16 +523,36 @@ class WAVConverterPage:
             
             if mode == "single":
                 from pathlib import Path
-                success = converter.process_single_file(Path(single_file))
+                success = converter.process_single_file(Path(single_file), cancel_event=self.conversion_cancel_event)
                 if not success:
+                    if self.conversion_cancel_event.is_set():
+                        self.log_callback("WAV to FLAC conversion cancelled", "WARNING")
+                        self.status_var.set("Cancelled")
+                        return
                     raise RuntimeError("Single file conversion failed")
             else:
-                converter.convert_all()
+                converter.convert_all(cancel_event=self.conversion_cancel_event)
             
-            self.log_callback("WAV to FLAC conversion completed successfully", "SUCCESS")
+            if converter.stats.get('cancelled'):
+                self.status_var.set("Cancelled")
+                self.log_callback(
+                    f"WAV to FLAC conversion cancelled ({converter.stats['converted']} converted, "
+                    f"{converter.stats['failed']} failed)",
+                    "WARNING",
+                )
+            elif converter.stats.get('failed'):
+                self.status_var.set("Completed with failures")
+                self.log_callback(
+                    f"WAV to FLAC conversion completed with {converter.stats['failed']} failure(s)",
+                    "WARNING",
+                )
+            else:
+                self.status_var.set("Completed")
+                self.log_callback("WAV to FLAC conversion completed successfully", "SUCCESS")
             
         except Exception as e:
             self.log_callback(f"WAV to FLAC conversion failed: {str(e)}", "ERROR")
+            self.status_var.set("Failed")
         finally:
             # Update button states
             self.parent.after(0, lambda: self.start_btn.configure(state=tk.NORMAL))
@@ -515,6 +561,6 @@ class WAVConverterPage:
     def stop_conversion(self):
         """Stop WAV to FLAC conversion process"""
         self.log_callback("WAV to FLAC conversion stop requested", "WARNING")
-        # Update button states
-        self.start_btn.configure(state=tk.NORMAL)
+        self.status_var.set("Stop requested...")
+        self.conversion_cancel_event.set()
         self.stop_btn.configure(state=tk.DISABLED)

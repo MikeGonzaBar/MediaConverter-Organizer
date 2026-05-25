@@ -28,6 +28,7 @@ class MediaConverterOrganizerGUI:
     """Main GUI application class"""
     
     def __init__(self):
+        WindowManager.set_process_app_id()
         self.root = tk.Tk()
         self.setup_window()
         self.setup_styles()
@@ -78,6 +79,7 @@ class MediaConverterOrganizerGUI:
     def setup_logging(self):
         """Setup logging system"""
         self.log_manager = LogManager()
+        self.dependency_warnings = []
         self._check_dependencies()
     
     def _check_dependencies(self):
@@ -99,6 +101,7 @@ class MediaConverterOrganizerGUI:
                         f"FFmpeg not found. Install with: {install_cmd}",
                         "WARNING"
                     )
+                    self.dependency_warnings.append(f"FFmpeg not found. Install with: {install_cmd}")
                 
                 # Log fpcalc status (optional)
                 if not status['fpcalc']:
@@ -113,6 +116,9 @@ class MediaConverterOrganizerGUI:
                     self.log_manager.log_message(
                         f"Missing required packages: {', '.join(required)}. Install with: pip install {' '.join(required)}",
                         "WARNING"
+                    )
+                    self.dependency_warnings.append(
+                        f"Missing packages: {', '.join(required)}. Install with: pip install {' '.join(required)}"
                     )
             except Exception:
                 # Silently fail if dependency checker has issues
@@ -129,6 +135,25 @@ class MediaConverterOrganizerGUI:
         
         # Create sidebar
         self.sidebar = self.nav_manager.create_sidebar()
+
+        self.logs_restore_panel = tk.Frame(self.main_container, bg='#1C1C1C', width=88)
+        self.logs_restore_panel.pack_propagate(False)
+        restore_btn = tk.Button(
+            self.logs_restore_panel,
+            text="Logs",
+            command=self.toggle_logs_panel,
+            font=('Segoe UI', 10, 'bold'),
+            bg='#2D2D2D',
+            fg='#FFFFFF',
+            activebackground='#3A3A3A',
+            activeforeground='#FFFFFF',
+            relief='flat',
+            borderwidth=0,
+            padx=10,
+            pady=10,
+            cursor='hand2',
+        )
+        restore_btn.pack(fill=tk.X, padx=10, pady=18)
         
         # Create a paned window for resizable content and logs panels
         # Users can drag the sash (divider) to resize the Activity Log panel
@@ -137,11 +162,12 @@ class MediaConverterOrganizerGUI:
         
         # Content area (left side of paned window)
         self.content_area = ttk.Frame(self.paned_window, style='Content.TFrame')
-        self.paned_window.add(self.content_area, weight=2)  # Give it more weight initially
+        self.paned_window.add(self.content_area, weight=5)  # Give the primary workflow more room
         
         # Persistent logs panel on the right (resizable) - Windows 11 dark theme
         self.logs_panel = tk.Frame(self.paned_window, bg='#1C1C1C')  # Windows 11 dark background
-        self.paned_window.add(self.logs_panel, weight=1)  # Give it less weight initially
+        self.paned_window.add(self.logs_panel, weight=2)  # Logs start useful but secondary
+        self.logs_collapsed = False
         
         # Configure the paned window after adding all panes
         self.configure_paned_window()
@@ -150,9 +176,26 @@ class MediaConverterOrganizerGUI:
         logs_header = tk.Frame(self.logs_panel, bg='#1C1C1C')
         logs_header.pack(fill=tk.X, padx=20, pady=(16, 0))
         
+        self.logs_toggle_btn = tk.Button(
+            logs_header,
+            text="Hide",
+            font=('Segoe UI', 9),
+            bg='#2D2D2D',
+            fg='#FFFFFF',
+            activebackground='#3A3A3A',
+            activeforeground='#FFFFFF',
+            relief='flat',
+            borderwidth=0,
+            padx=9,
+            pady=5,
+            cursor='hand2',
+            command=self.toggle_logs_panel
+        )
+        self.logs_toggle_btn.pack(side=tk.RIGHT, padx=(8, 0))
+
         logs_title = tk.Label(
             logs_header, 
-            text="📝 Activity Logs",
+            text="Activity Logs",
             font=('Segoe UI', 13, 'bold'),
             bg='#1C1C1C',
             fg='#FFFFFF',
@@ -163,7 +206,7 @@ class MediaConverterOrganizerGUI:
         # Clear logs button - Gray button style
         clear_logs_btn = tk.Button(
             logs_header,
-            text="🗑️ Clear",
+            text="Clear",
             font=('Segoe UI', 9),
             bg='#4A4A4A',  # Gray background
             fg='#FFFFFF',  # White text
@@ -187,15 +230,41 @@ class MediaConverterOrganizerGUI:
         clear_logs_btn.bind('<Enter>', on_clear_enter)
         clear_logs_btn.bind('<Leave>', on_clear_leave)
         clear_logs_btn.pack(side=tk.RIGHT)
+
+        self.logs_body = tk.Frame(self.logs_panel, bg='#1C1C1C')
+        self.logs_body.pack(fill=tk.BOTH, expand=True)
+
+        filters_frame = tk.Frame(self.logs_body, bg='#1C1C1C')
+        filters_frame.pack(fill=tk.X, padx=20, pady=(12, 0))
+
+        self.log_filter_vars = {}
+        for label, level in (("Info", "INFO"), ("Success", "SUCCESS"), ("Warn", "WARNING"), ("Error", "ERROR")):
+            var = tk.BooleanVar(value=True)
+            self.log_filter_vars[level] = var
+            check = tk.Checkbutton(
+                filters_frame,
+                text=label,
+                variable=var,
+                command=lambda lvl=level, v=var: self.log_manager.set_level_visible(lvl, v.get()),
+                bg='#1C1C1C',
+                fg='#C0C0C0',
+                activebackground='#1C1C1C',
+                activeforeground='#FFFFFF',
+                selectcolor='#2D2D2D',
+                font=('Segoe UI', 9),
+                bd=0,
+                highlightthickness=0,
+            )
+            check.pack(side=tk.LEFT, padx=(0, 10))
         
         # Subtle separator line
-        logs_separator = tk.Frame(self.logs_panel, bg='#3D3D3D', height=1)
+        logs_separator = tk.Frame(self.logs_body, bg='#3D3D3D', height=1)
         logs_separator.pack(fill=tk.X, padx=20, pady=(12, 12))
         
         # Log display widget - Windows 11 dark theme
         from tkinter import scrolledtext
         self.side_log_text = scrolledtext.ScrolledText(
-            self.logs_panel,
+            self.logs_body,
             wrap=tk.WORD,
             font=('Consolas', 9),
             bg='#1C1C1C',  # Windows 11 dark background
@@ -223,8 +292,25 @@ class MediaConverterOrganizerGUI:
     def clear_logs(self):
         """Clear all activity logs"""
         if self.side_log_text:
+            self.log_manager.entries.clear()
             self.side_log_text.delete(1.0, tk.END)
             self.log_manager.log_message("Logs cleared", "INFO")
+
+    def toggle_logs_panel(self):
+        """Collapse or expand the Activity Logs panel."""
+        self.logs_collapsed = not self.logs_collapsed
+        if self.logs_collapsed:
+            self.paned_window.forget(self.logs_panel)
+            self.paned_window.pack_forget()
+            self.logs_restore_panel.pack(side=tk.RIGHT, fill=tk.Y)
+            self.paned_window.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        else:
+            self.logs_toggle_btn.configure(text="Hide")
+            self.logs_restore_panel.pack_forget()
+            panes = {str(pane) for pane in self.paned_window.panes()}
+            if str(self.logs_panel) not in panes:
+                self.paned_window.add(self.logs_panel, weight=2)
+        self.root.after(50, self._set_initial_sash_position)
     
     def configure_paned_window(self):
         """Configure the paned window settings"""
@@ -237,10 +323,13 @@ class MediaConverterOrganizerGUI:
         try:
             # Get the current width of the paned window
             paned_width = self.paned_window.winfo_width()
-            if paned_width > 100:  # Make sure the window is rendered
-                # Set sash to approximately 2/3 of the width
-                initial_position = int(paned_width * 0.67)
-                self.paned_window.sash_place(0, initial_position, 0)
+            if paned_width <= 100:
+                self.root.after(100, self._set_initial_sash_position)
+                return
+            if len(self.paned_window.panes()) > 1:
+                # Keep logs secondary, and make the collapsed panel genuinely compact.
+                initial_position = int(paned_width * 0.70)
+                self.paned_window.sashpos(0, initial_position)
         except tk.TclError:
             # If there's an error, try again later
             self.root.after(100, self._set_initial_sash_position)
@@ -251,7 +340,11 @@ class MediaConverterOrganizerGUI:
         
         # Create page instances
         self.media_organizer_page = MediaOrganizerPage(self.content_area, self.log_manager.log_message)
-        self.media_converter_page = MediaConverterPage(self.content_area, self.log_manager.log_message)
+        self.media_converter_page = MediaConverterPage(
+            self.content_area,
+            self.log_manager.log_message,
+            dependency_warnings=self.dependency_warnings,
+        )
         
         # Create pages
         self.pages['media_organizer'] = self.media_organizer_page.create_page()

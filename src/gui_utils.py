@@ -17,6 +17,39 @@ import platform
 
 class WindowManager:
     """Manages window properties and styling"""
+
+    APP_USER_MODEL_ID = "MediaConverterOrganizer.App"
+
+    COLORS = {
+        'bg_color': '#202020',
+        'sidebar_bg': '#1C1C1C',
+        'card_bg': '#2D2D2D',
+        'panel_bg': '#252525',
+        'accent_color': '#0078D4',
+        'accent_hover': '#106EBE',
+        'text_color': '#FFFFFF',
+        'muted_text': '#C0C0C0',
+        'border_color': '#3D3D3D',
+        'button_bg': '#4A4A4A',
+        'button_hover': '#5A5A5A',
+        'button_pressed': '#3A3A3A',
+        'success_color': '#107C10',
+        'warning_color': '#FFB900',
+        'error_color': '#D13438',
+    }
+
+    @staticmethod
+    def set_process_app_id():
+        """Set the Windows taskbar app identity before Tk creates a window."""
+        if sys.platform != "win32":
+            return
+
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                WindowManager.APP_USER_MODEL_ID
+            )
+        except Exception:
+            pass
     
     @staticmethod
     def set_window_icon(root):
@@ -37,14 +70,10 @@ class WindowManager:
             
             # Set window icon
             if ico_path.exists():
-                root.iconbitmap(str(ico_path))
-                
-                # Set Windows taskbar icon
-                if sys.platform == "win32":
-                    try:
-                        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MediaConverterOrganizer.1.0")
-                    except:
-                        pass
+                try:
+                    root.iconbitmap(default=str(ico_path))
+                except tk.TclError:
+                    root.iconbitmap(str(ico_path))
             else:
                 # Fallback to PNG
                 if png_path.exists():
@@ -425,6 +454,99 @@ class WindowManager:
         content_frame.pack(fill=tk.X, padx=padding, pady=(0, padding))
         
         return section_frame, content_frame
+
+    @staticmethod
+    def create_collapsible_section(parent, title, expanded=True, padding=20):
+        """Create a compact section that can collapse its body."""
+        colors = WindowManager.COLORS
+        section_frame = tk.Frame(parent, bg=colors['card_bg'], relief='flat')
+
+        header = tk.Frame(section_frame, bg=colors['card_bg'])
+        header.pack(fill=tk.X, padx=padding, pady=(0, 12))
+
+        state = {'expanded': expanded}
+        indicator = tk.Label(
+            header,
+            text='v' if expanded else '>',
+            font=('Segoe UI', 11, 'bold'),
+            bg=colors['card_bg'],
+            fg=colors['muted_text'],
+            width=2,
+            anchor='w',
+        )
+        indicator.pack(side=tk.LEFT)
+
+        title_label = tk.Label(
+            header,
+            text=title,
+            font=('Segoe UI', 12, 'bold'),
+            bg=colors['card_bg'],
+            fg=colors['text_color'],
+            anchor='w',
+        )
+        title_label.pack(side=tk.LEFT)
+
+        body = tk.Frame(section_frame, bg=colors['card_bg'])
+        if expanded:
+            body.pack(fill=tk.X, padx=padding, pady=(0, padding))
+
+        def toggle():
+            state['expanded'] = not state['expanded']
+            indicator.configure(text='v' if state['expanded'] else '>')
+            if state['expanded']:
+                body.pack(fill=tk.X, padx=padding, pady=(0, padding))
+            else:
+                body.pack_forget()
+
+        for widget in (header, indicator, title_label):
+            widget.bind('<Button-1>', lambda _event: toggle())
+            widget.configure(cursor='hand2')
+
+        section_frame.toggle = toggle
+        section_frame.is_expanded = lambda: state['expanded']
+        return section_frame, body
+
+    @staticmethod
+    def create_segmented_control(parent, variable, options, command=None):
+        """Create a button-based segmented control bound to a StringVar."""
+        colors = WindowManager.COLORS
+        frame = tk.Frame(parent, bg=colors['card_bg'])
+        buttons = {}
+
+        def refresh():
+            current = variable.get()
+            for value, button in buttons.items():
+                selected = value == current
+                button.configure(
+                    bg=colors['accent_color'] if selected else colors['panel_bg'],
+                    fg=colors['text_color'] if selected else colors['muted_text'],
+                    activebackground=colors['accent_hover'] if selected else colors['button_hover'],
+                )
+
+        def select(value):
+            variable.set(value)
+            refresh()
+            if command:
+                command()
+
+        for label, value in options:
+            button = tk.Button(
+                frame,
+                text=label,
+                command=lambda v=value: select(v),
+                font=('Segoe UI', 10, 'normal'),
+                relief='flat',
+                bd=0,
+                padx=14,
+                pady=8,
+                cursor='hand2',
+            )
+            button.pack(side=tk.LEFT, padx=(0, 6))
+            buttons[value] = button
+
+        refresh()
+        frame.refresh = refresh
+        return frame
     
     @staticmethod
     def bind_mousewheel(widget, scrollbar):
@@ -448,6 +570,8 @@ class LogManager:
     def __init__(self, log_widget=None):
         self.log_widget = log_widget
         self.log_queue = queue.Queue()
+        self.entries = []
+        self.visible_levels = {"INFO", "SUCCESS", "WARNING", "ERROR"}
         # Windows 11 dark theme color scheme for logs
         self.color_map = {
             "INFO": "#FFFFFF",        # White for info
@@ -462,6 +586,38 @@ class LogManager:
         formatted_message = f"[{timestamp}] {level}: {message}"
         
         self.log_queue.put((formatted_message, level))
+
+    def set_level_visible(self, level, visible):
+        """Show or hide a log level in the attached log widget."""
+        if visible:
+            self.visible_levels.add(level)
+        else:
+            self.visible_levels.discard(level)
+        self.redraw()
+
+    def redraw(self):
+        """Redraw the log widget from stored entries."""
+        if not self.log_widget:
+            return
+
+        self.log_widget.configure(state=tk.NORMAL)
+        self.log_widget.delete(1.0, tk.END)
+        for message, level in self.entries:
+            if level in self.visible_levels:
+                self._insert_message(message, level)
+        self.log_widget.see(tk.END)
+
+    def _insert_message(self, message, level):
+        self.log_widget.insert(tk.END, message + "\n")
+        start_line = self.log_widget.index(tk.END + "-2l")
+        end_line = self.log_widget.index(tk.END + "-1l")
+        tag_name = f"log_{level}"
+        self.log_widget.tag_add(tag_name, start_line, end_line)
+        self.log_widget.tag_config(
+            tag_name,
+            foreground=self.color_map.get(level, "#FFFFFF"),
+            font=('Consolas', 9)
+        )
     
     def check_queue(self):
         """Check for new log messages and display them"""
@@ -469,24 +625,10 @@ class LogManager:
             while True:
                 message, level = self.log_queue.get_nowait()
                 if self.log_widget:
-                    # Insert message with newline
-                    self.log_widget.insert(tk.END, message + "\n")
-                    
-                    # Color the last line based on log level
-                    start_line = self.log_widget.index(tk.END + "-2l")
-                    end_line = self.log_widget.index(tk.END + "-1l")
-                    
-                    # Configure tag for this log level
-                    tag_name = f"log_{level}"
-                    self.log_widget.tag_add(tag_name, start_line, end_line)
-                    self.log_widget.tag_config(
-                        tag_name,
-                        foreground=self.color_map.get(level, "#202020"),
-                        font=('Consolas', 9)
-                    )
-                    
-                    # Auto-scroll to bottom
-                    self.log_widget.see(tk.END)
+                    self.entries.append((message, level))
+                    if level in self.visible_levels:
+                        self._insert_message(message, level)
+                        self.log_widget.see(tk.END)
         except queue.Empty:
             pass
         
@@ -535,9 +677,9 @@ class NavigationManager:
                 raise FileNotFoundError("Logo not found")
         except:
             # Fallback to text
-            logo_label = tk.Label(title_frame, text="🎮", 
-                                font=('Segoe UI', 28), 
-                                bg=sidebar_bg, 
+            logo_label = tk.Label(title_frame, text="MC",
+                                font=('Segoe UI', 28),
+                                bg=sidebar_bg,
                                 fg=text_color)
             logo_label.pack(pady=(0, 12))
         
@@ -555,8 +697,8 @@ class NavigationManager:
         
         # Navigation items
         nav_items = [
-            ("📁 Media Organizer", "media_organizer"),
-            ("🔄 Media Converter", "media_converter")
+            ("Media Organizer", "media_organizer"),
+            ("Media Converter", "media_converter")
         ]
         
         for text, page_id in nav_items:

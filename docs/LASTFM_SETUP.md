@@ -1,152 +1,84 @@
-# Last.fm API Setup Guide
+# Last.fm API Setup
 
-## 🔑 **Getting Your Last.fm API Key**
+The WAV-to-FLAC converter can use Last.fm as an optional metadata source after MusicBrainz and AcoustID. It is useful for artist normalization, genre hints, and metadata lookup for tracks that are hard to identify from MusicBrainz alone.
 
-### **Step 1: Create Last.fm Account**
+## Get API Credentials
 
-1. Visit [Last.fm](https://www.last.fm)
-2. Sign up for a free account (or log in if you have one)
+1. Sign in or create an account at `https://www.last.fm`.
+2. Open `https://www.last.fm/api`.
+3. Choose "Get an API account".
+4. Use a name such as `Media Converter Organizer`.
+5. Keep the generated API key. The shared secret is optional for the current read-only lookup path.
 
-### **Step 2: Apply for API Access**
+## Configure The App
 
-1. Go to [Last.fm API page](https://www.last.fm/api)
-2. Click **"Get an API account"**
-3. Fill out the application form:
-   - **Application name**: `WAV-to-FLAC-Converter`
-   - **Description**: `Personal music metadata enhancement tool`
-   - **Application homepage**: Leave blank or use your GitHub
-   - **Contact email**: Your email address
+Create a `.env` file in the project root:
 
-### **Step 3: Get Your API Credentials**
+```env
+LASTFM_API_KEY=your_lastfm_api_key_here
+LASTFM_API_SECRET=your_lastfm_secret_here
+```
 
-After approval (usually instant), you'll get:
+The app loads `.env` through `python-dotenv` when it is installed. Environment variables also work:
 
-- **API Key**: A long string like `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6`
-- **Secret**: Another string (optional for read-only access)
-
-## ⚙️ **Configure the Enhanced Script**
-
-### **Option 1: Edit the Script** *(Recommended)*
-
-1. Open `wav_to_flac_converter_enhanced.py`
-2. Find these lines near the top:
-
-   ```python
-   LASTFM_API_KEY = "YOUR_LASTFM_API_KEY"
-   LASTFM_API_SECRET = "YOUR_LASTFM_SECRET"
-   ```
-
-3. Replace with your actual keys:
-
-   ```python
-   LASTFM_API_KEY = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
-   LASTFM_API_SECRET = "your_secret_here"
-   ```
-
-### **Option 2: Environment Variables** *(Advanced)*
-
-Set environment variables (more secure):
+```cmd
+set LASTFM_API_KEY=your_lastfm_api_key_here
+set LASTFM_API_SECRET=your_lastfm_secret_here
+```
 
 ```bash
-# Windows
-set LASTFM_API_KEY=your_key_here
-set LASTFM_API_SECRET=your_secret_here
-
-# Linux/Mac
-export LASTFM_API_KEY=your_key_here
-export LASTFM_API_SECRET=your_secret_here
+export LASTFM_API_KEY=your_lastfm_api_key_here
+export LASTFM_API_SECRET=your_lastfm_secret_here
 ```
 
-## 🧪 **Test the Integration**
+## Test From The Command Line
 
-Run the enhanced script and check the logs:
+Run from the project root:
 
 ```bash
-python wav_to_flac_converter_enhanced.py "test_folder" --fingerprinting
+python src/wav_to_flac_converter.py "path\to\wav_folder" --fingerprinting
 ```
 
-Look for:
+Look for one of these log messages:
 
-- ✅ `[LASTFM] Last.fm API enabled`
-- ❌ `[LASTFM] Last.fm API key not configured`
-
-## 🎯 **What Last.fm Provides**
-
-### **Enhanced Metadata**
-
-- **Artist name corrections** ("3 en linea" → "3 En Línea")
-- **Proper capitalization** and formatting
-- **Genre tags** from user community
-- **Popularity data** (playcount, listeners)
-
-### **Perfect for Mexican Music**
-
-- **Better international coverage** than MusicBrainz alone
-- **User-generated data** includes regional artists
-- **Artist correction service** helps with spelling variations
-- **Genre classification** from real users
-
-### **Fallback Strategy**
-
-```
-1. Check existing metadata
-2. Try album-based lookup (MusicBrainz)
-3. Try individual track search (MusicBrainz)  
-4. Try audio fingerprinting (AcoustID)
-5. Try Last.fm text search ⭐ NEW
-6. Use directory structure
+```text
+[LASTFM] Last.fm API enabled
+[LASTFM] Last.fm API key not configured
 ```
 
-## 🔄 **How It Improves Your Collection**
+## Metadata Lookup Order
 
-### **Before:**
+The converter prefers existing trustworthy metadata, then tries progressively broader lookup methods:
 
+1. Existing FLAC metadata.
+2. MusicBrainz album lookup.
+3. MusicBrainz recording lookup.
+4. AcoustID fingerprint lookup when `--fingerprinting` is enabled and `fpcalc` is available.
+5. Last.fm text search when `LASTFM_API_KEY` is configured.
+6. Directory and filename fallback.
+
+## Troubleshooting
+
+### Last.fm API Key Not Configured
+
+- Confirm `.env` is in the project root.
+- Confirm the variable name is exactly `LASTFM_API_KEY`.
+- Restart the app or terminal after changing environment variables.
+
+### Invalid API Key
+
+- Copy the full key from the Last.fm API page again.
+- Remove surrounding quotes or trailing spaces from `.env`.
+- Confirm the key is not the application shared secret.
+
+### Track Not Found
+
+This is normal for rare tracks. The converter will continue through the fallback strategy and use MusicBrainz, AcoustID, or directory-derived metadata when available.
+
+### Fingerprinting Does Not Run
+
+Last.fm lookup does not require `fpcalc`, but AcoustID fingerprinting does. Confirm:
+
+```bash
+fpcalc -version
 ```
-Artist: 3 en línea
-Album: Antro-Pop
-Title: Track03
-Genre: (empty)
-```
-
-### **After with Last.fm:**
-
-```
-Artist: 3 En Línea
-Album: Antro-Pop  
-Title: La Cumbia del Corazón
-Genre: Latin Pop, Mexican, Cumbia
-Playcount: 15,420
-```
-
-## 🚨 **Troubleshooting**
-
-### **"Last.fm API key not configured"**
-
-- Make sure you replaced `YOUR_LASTFM_API_KEY` with your actual key
-- Check for typos in the API key
-
-### **"pylast.WSError: Invalid API key"**
-
-- Double-check your API key is correct
-- Make sure you copied the entire key
-
-### **"Track not found"**
-
-- Normal for rare tracks - script will try other methods
-- Last.fm works best with known artists/songs
-
-### **Rate Limiting**
-
-- Last.fm is generous with rate limits
-- No special handling needed for normal use
-
-## 💡 **Tips for Best Results**
-
-1. **Use with fingerprinting**: `--fingerprinting` for maximum coverage
-2. **Check logs**: Monitor what each service finds
-3. **International artists**: Last.fm often has better coverage than MusicBrainz
-4. **Genre enhancement**: Last.fm adds community-generated genres
-
----
-
-**Ready to enhance your Mexican music collection!** 🎵🇲🇽

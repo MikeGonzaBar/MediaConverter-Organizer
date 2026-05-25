@@ -7,16 +7,16 @@ echo
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
     echo "ERROR: Python 3 is not installed or not in PATH"
-    echo "Please install Python 3.7+ from your package manager or https://python.org"
+    echo "Please install Python 3.10+ from your package manager or https://python.org"
     exit 1
 fi
 
 # Check Python version
 python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-required_version="3.7"
+required_version="3.10"
 
 if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]; then
-    echo "ERROR: Python 3.7+ is required. Found Python $python_version"
+    echo "ERROR: Python 3.10+ is required. Found Python $python_version"
     exit 1
 fi
 

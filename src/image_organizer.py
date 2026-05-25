@@ -9,6 +9,7 @@ For debugging purposes, it prints the files that would be moved without actually
 import os
 import sys
 import argparse
+import filecmp
 from datetime import datetime
 from pathlib import Path
 import mimetypes
@@ -29,6 +30,10 @@ IMAGE_EXTENSIONS = {
     '.webp', '.svg', '.ico', '.raw', '.cr2', '.nef', '.arw',
     '.heic', '.heif', '.avif', '.jxl'
 }
+
+def is_cancelled(cancel_event):
+    """Return True when an optional cancellation event has been requested."""
+    return bool(cancel_event and cancel_event.is_set())
 
 def is_image_file(file_path):
     """
@@ -210,7 +215,7 @@ def get_month_name(month_number):
     ]
     return month_names[month_number - 1]
 
-def scan_and_organize_images(source_dir):
+def scan_and_organize_images(source_dir, cancel_event=None):
     """
     Scan the source directory recursively for images and organize them by year/month.
     Uses EXIF capture dates when available, otherwise uses the earliest filesystem date.
@@ -241,6 +246,10 @@ def scan_and_organize_images(source_dir):
     scanned_files = 0
     
     for file_path in source_dir.rglob('*'):
+        if is_cancelled(cancel_event):
+            print("Operation cancelled while scanning images.")
+            return
+
         scanned_files += 1
         
         # Show progress every 100 files
@@ -321,6 +330,10 @@ def scan_and_organize_images(source_dir):
             print(f"  {month:02d}-{month_name}/")
             
             for file_info in organized_files[(year, month)]:
+                if is_cancelled(cancel_event):
+                    print("Operation cancelled while moving images.")
+                    return
+
                 source = file_info['source']
                 target = file_info['target']
                 date = file_info['date']
@@ -344,10 +357,14 @@ def scan_and_organize_images(source_dir):
                         
                         if source_exif is not None and target_exif is not None:
                             if compare_exif_data(source_exif, target_exif):
-                                print(f"      ✓ EXIF data is identical - deleting source file")
-                                source.unlink()  # Delete the source file
-                                print(f"      ✓ SOURCE FILE DELETED (duplicate found)")
-                                moved_count += 1
+                                if filecmp.cmp(source, target, shallow=False):
+                                    print(f"      ✓ EXIF data and file contents are identical - deleting source file")
+                                    source.unlink()  # Delete the source file
+                                    print(f"      ✓ SOURCE FILE DELETED (duplicate found)")
+                                    moved_count += 1
+                                else:
+                                    print(f"      ✗ EXIF data matches but file contents differ - skipping to avoid data loss")
+                                    error_count += 1
                             else:
                                 print(f"      ✗ EXIF data differs - skipping to avoid overwrite")
                                 error_count += 1
@@ -406,7 +423,7 @@ def scan_and_organize_images(source_dir):
 class ImageOrganizer:
     """Class wrapper for image organization functionality"""
     
-    def __init__(self, directory, mode="check", log_callback=None):
+    def __init__(self, directory, mode="check", log_callback=None, cancel_event=None):
         """
         Initialize the ImageOrganizer
         
@@ -418,6 +435,7 @@ class ImageOrganizer:
         self.directory = Path(directory)
         self.mode = mode
         self.log_callback = log_callback or self._default_log
+        self.cancel_event = cancel_event
     
     def _default_log(self, message, level="INFO"):
         """Default logging function that prints to console"""
@@ -440,7 +458,7 @@ class ImageOrganizer:
             self._scan_and_organize_images_dry_run()
         elif self.mode == "move":
             # For move mode, actually organize the files
-            scan_and_organize_images(self.directory)
+            scan_and_organize_images(self.directory, cancel_event=self.cancel_event)
         else:
             raise ValueError(f"Invalid mode: {self.mode}. Must be 'check', 'dry_run', or 'move'.")
     
@@ -478,6 +496,10 @@ class ImageOrganizer:
         scanned_files = 0
         
         for file_path in self.directory.rglob('*'):
+            if is_cancelled(self.cancel_event):
+                self.log_callback("Image organization cancelled while scanning", "WARNING")
+                return
+
             scanned_files += 1
             
             # Show progress every 100 files
@@ -603,8 +625,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python image_organizer.py /path/to/photos
-  python image_organizer.py "C:\\Users\\Username\\Pictures"
+  python src/image_organizer.py /path/to/photos
+  python src/image_organizer.py "C:\\Users\\Username\\Pictures"
 
 Note: Install Pillow for EXIF support: pip install Pillow
         """

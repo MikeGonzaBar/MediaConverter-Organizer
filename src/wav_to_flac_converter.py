@@ -27,7 +27,7 @@ Requirements:
 - ffmpeg (for pydub to work with FLAC)
 
 Usage:
-    python wav_to_flac_converter_enhanced.py <source_path> [options]
+    python src/wav_to_flac_converter.py <source_path> [options]
 """
 
 import os
@@ -401,7 +401,7 @@ class AdvancedMetadataLookup:
             
             # Check for year in album name (various formats)
             year_patterns = [
-                r'\b(19|20)\d{2}\b',  # Standard 4-digit year
+                r'\b((?:19|20)\d{2})\b',  # Standard 4-digit year
                 r'\((\d{4})\)',  # Year in parentheses
                 r'\[(\d{4})\]',  # Year in brackets
             ]
@@ -409,7 +409,7 @@ class AdvancedMetadataLookup:
             for pattern in year_patterns:
                 year_match = re.search(pattern, album_part)
                 if year_match:
-                    metadata['year'] = year_match.group(1) if '(' in pattern or '[' in pattern else year_match.group(0)
+                    metadata['year'] = year_match.group(1)
                     # Remove year from album name
                     album_clean = re.sub(pattern, '', album_part).strip()
                     album_clean = re.sub(r'\s*[-_\(\)\[\]]\s*', ' ', album_clean).strip()
@@ -943,6 +943,7 @@ class EnhancedWAVToFLACConverter:
             'total_files': 0,
             'converted': 0,
             'failed': 0,
+            'cancelled': 0,
             'skipped_flac': 0,
             'metadata_found': 0,
             'metadata_fallback': 0,
@@ -958,6 +959,10 @@ class EnhancedWAVToFLACConverter:
         logger.info(f"Compatibility mode: {self.compatibility_mode}")
         logger.info(f"Metadata enabled: {self.enable_metadata}")
         logger.info(f"Audio fingerprinting: {self.enable_fingerprinting}")
+
+    @staticmethod
+    def _is_cancelled(cancel_event) -> bool:
+        return bool(cancel_event and cancel_event.is_set())
     
     def find_audio_files(self) -> List[Path]:
         """Find all WAV and FLAC files in the source directory."""
@@ -1040,8 +1045,13 @@ class EnhancedWAVToFLACConverter:
             logger.error(f"  [METADATA_ERROR] Failed to embed metadata: {str(e)}")
             return False
     
-    def convert_wav_to_flac(self, input_file: Path, output_file: Path) -> bool:
+    def convert_wav_to_flac(self, input_file: Path, output_file: Path, cancel_event=None, timeout_seconds=None) -> bool:
         """Convert a single WAV file to FLAC."""
+        del timeout_seconds  # pydub manages ffmpeg internally; keep API aligned with other converters.
+        if self._is_cancelled(cancel_event):
+            logger.warning(f"  [CANCELLED] Skipping conversion: {input_file.name}")
+            return False
+
         try:
             # Load the WAV file
             audio = AudioSegment.from_wav(str(input_file))
@@ -1088,8 +1098,12 @@ class EnhancedWAVToFLACConverter:
             logger.error(f"  [ERROR] Conversion failed: {str(e)}")
             return False
     
-    def process_single_file(self, audio_file: Path) -> bool:
+    def process_single_file(self, audio_file: Path, cancel_event=None, timeout_seconds=None) -> bool:
         """Process a single audio file with conversion and metadata."""
+        if self._is_cancelled(cancel_event):
+            logger.warning(f"[CANCELLED] Skipping file: {audio_file}")
+            return False
+
         try:
             relative_path = self.get_relative_path(audio_file)
             output_dir = self.create_output_directory(relative_path)
@@ -1114,11 +1128,15 @@ class EnhancedWAVToFLACConverter:
             if needs_conversion:
                 logger.info(f"[PROCESSING] {relative_path}")
                 # Convert WAV to FLAC
-                if not self.convert_wav_to_flac(audio_file, output_file):
+                if not self.convert_wav_to_flac(audio_file, output_file, cancel_event=cancel_event, timeout_seconds=timeout_seconds):
                     return False
             
             # Handle metadata if enabled
             if self.enable_metadata and self.metadata_lookup:
+                if self._is_cancelled(cancel_event):
+                    logger.warning(f"[CANCELLED] Skipping metadata for: {audio_file}")
+                    return False
+
                 # Get existing metadata from the output FLAC file
                 existing_metadata = self.metadata_lookup.get_existing_metadata(output_file)
                 
@@ -1175,7 +1193,7 @@ class EnhancedWAVToFLACConverter:
             logger.error(f"[ERROR] Failed to process {audio_file}: {str(e)}")
             return False
     
-    def convert_all(self) -> Tuple[int, int]:
+    def convert_all(self, cancel_event=None, timeout_seconds=None) -> Tuple[int, int]:
         """Convert all WAV files in the source directory."""
         audio_files = self.find_audio_files()
         self.stats['total_files'] = len(audio_files)
@@ -1188,10 +1206,19 @@ class EnhancedWAVToFLACConverter:
         logger.info("=" * 80)
         
         for i, audio_file in enumerate(audio_files, 1):
+            if self._is_cancelled(cancel_event):
+                self.stats['cancelled'] += len(audio_files) - i + 1
+                logger.warning(f"\n[CANCELLED] Conversion stopped before file {i} of {len(audio_files)}")
+                break
+
             logger.info(f"\n[{i}/{len(audio_files)}] Processing file {i} of {len(audio_files)}")
             
-            if self.process_single_file(audio_file):
+            if self.process_single_file(audio_file, cancel_event=cancel_event, timeout_seconds=timeout_seconds):
                 self.stats['converted'] += 1
+            elif self._is_cancelled(cancel_event):
+                self.stats['cancelled'] += len(audio_files) - i + 1
+                logger.warning(f"\n[CANCELLED] Conversion stopped during file {i} of {len(audio_files)}")
+                break
             else:
                 self.stats['failed'] += 1
             
@@ -1215,6 +1242,7 @@ class EnhancedWAVToFLACConverter:
         print(f"WAV files converted:    {self.stats['converted']}")
         print(f"FLAC files processed:   {self.stats['skipped_flac']}")
         print(f"Failed conversions:     {self.stats['failed']}")
+        print(f"Cancelled files:        {self.stats['cancelled']}")
         
         if self.enable_metadata:
             print(f"\nMETADATA SOURCES:")
@@ -1242,10 +1270,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python wav_to_flac_converter_enhanced.py "C:\\Music\\WAV Files"
-  python wav_to_flac_converter_enhanced.py "/path/to/wav/files" --compatibility
-  python wav_to_flac_converter_enhanced.py "./music" --no-metadata
-  python wav_to_flac_converter_enhanced.py "./music" --aggressive-metadata --fingerprinting
+  python src/wav_to_flac_converter.py "C:\\Music\\WAV Files"
+  python src/wav_to_flac_converter.py "/path/to/wav/files" --compatibility
+  python src/wav_to_flac_converter.py "./music" --no-metadata
+  python src/wav_to_flac_converter.py "./music" --aggressive-metadata --fingerprinting
 
 Features:
   - Intelligent metadata lookup for international artists

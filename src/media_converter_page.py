@@ -14,9 +14,10 @@ from src.gui_utils import WindowManager
 class MediaConverterPage:
     """Creates the comprehensive Media Converter page"""
     
-    def __init__(self, parent, log_callback):
+    def __init__(self, parent, log_callback, dependency_warnings=None):
         self.parent = parent
         self.log_callback = log_callback
+        self.dependency_warnings = dependency_warnings or []
         self.converter = MediaConverter(log_callback)
         
         # Initialize variables
@@ -53,14 +54,33 @@ class MediaConverterPage:
         
         # Auto-output directory tracking
         self.output_dir_manually_set = False
+        self.media_cancel_event = threading.Event()
+        self.job_status_var = tk.StringVar(value="Ready")
     
     def create_page(self):
         """Create the comprehensive Media Converter page"""
         page = ttk.Frame(self.parent, style='Content.TFrame')
         
         # Page title
-        title_label = ttk.Label(page, text="🔄 Media Converter", style='Title.TLabel')
-        title_label.pack(pady=(0, 20))
+        title_label = ttk.Label(page, text="Media Converter", style='Title.TLabel')
+        title_label.pack(anchor=tk.W, pady=(0, 16))
+
+        if self.dependency_warnings:
+            banner = tk.Frame(page, bg='#332A12', highlightthickness=1, highlightbackground='#7A5B00')
+            banner.pack(fill=tk.X, pady=(0, 14))
+            banner_text = tk.Label(
+                banner,
+                text=self.dependency_warnings[0],
+                font=('Segoe UI', 9),
+                bg='#332A12',
+                fg='#FFDF7E',
+                anchor='w',
+                wraplength=720,
+                justify=tk.LEFT,
+                padx=12,
+                pady=8,
+            )
+            banner_text.pack(fill=tk.X)
         
         # Simple Mode toggle
         mode_frame = ttk.Frame(page)
@@ -68,7 +88,7 @@ class MediaConverterPage:
         
         simple_mode_checkbox = ttk.Checkbutton(
             mode_frame, 
-            text="🎯 Simple Mode (Format conversion only)", 
+            text="Simple Mode (format conversion only)",
             variable=self.simple_mode_var,
             command=self.toggle_simple_mode
         )
@@ -78,7 +98,7 @@ class MediaConverterPage:
         # Simple mode status label
         self.simple_mode_status = ttk.Label(
             mode_frame, 
-            text="✅ Using optimal settings for format conversion", 
+            text="Optimized settings",
             style='Success.TLabel'
         )
         self.simple_mode_status.pack(side=tk.LEFT, padx=(20, 0))
@@ -93,8 +113,9 @@ class MediaConverterPage:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(canvas_window, width=e.width))
         
         # Enable mouse wheel scrolling on the main content (Windows/Mac/Linux)
         def _on_mousewheel(event):
@@ -117,42 +138,42 @@ class MediaConverterPage:
         scrollable_frame.bind("<Button-5>", _on_mousewheel)
         
         # Input/Output Selection Card - Modern Windows 11 style
-        io_card, io_content = WindowManager.create_modern_section(scrollable_frame, "📂 Input & Output")
+        io_card, io_content = WindowManager.create_modern_section(scrollable_frame, "Input and Output")
         io_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Mode toggle (Directory vs Single File)
         mode_frame = ttk.Frame(io_content)
         mode_frame.pack(fill=tk.X, pady=(0, 10))
-        ttk.Radiobutton(mode_frame, text="📁 Directory Mode", variable=self.input_mode_var, value="directory", command=self.update_source_visibility).pack(side=tk.LEFT, padx=(0, 15))
-        ttk.Radiobutton(mode_frame, text="🎵 Single File Mode", variable=self.input_mode_var, value="single", command=self.update_source_visibility).pack(side=tk.LEFT)
+        ttk.Radiobutton(mode_frame, text="Directory Mode", variable=self.input_mode_var, value="directory", command=self.update_source_visibility).pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Radiobutton(mode_frame, text="Single File Mode", variable=self.input_mode_var, value="single", command=self.update_source_visibility).pack(side=tk.LEFT)
 
         # Input directory
-        self.input_dir_label = ttk.Label(io_content, text="📁 Input Directory:", style='Info.TLabel')
+        self.input_dir_label = ttk.Label(io_content, text="Input Directory:", style='Info.TLabel')
         input_frame = ttk.Frame(io_content)
         
         input_entry = ttk.Entry(input_frame, textvariable=self.media_input_dir_var, width=60, font=('Segoe UI', 10))
         input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        input_browse_btn = WindowManager.create_gray_button(input_frame, text="📁 Browse", command=self.browse_media_input_directory)
+        input_browse_btn = WindowManager.create_gray_button(input_frame, text="Browse", command=self.browse_media_input_directory)
         input_browse_btn.pack(side=tk.RIGHT)
 
         # Input file (shown in single mode)
-        self.input_file_label = ttk.Label(io_content, text="🎵 Input File:", style='Info.TLabel')
+        self.input_file_label = ttk.Label(io_content, text="Input File:", style='Info.TLabel')
         self.input_file_frame = ttk.Frame(io_content)
         self.input_file_entry = ttk.Entry(self.input_file_frame, textvariable=self.media_input_file_var, width=60, font=('Segoe UI', 10))
         self.input_file_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
-        self.input_file_btn = WindowManager.create_gray_button(self.input_file_frame, text="🎵 Browse File", command=self.browse_media_input_file)
+        self.input_file_btn = WindowManager.create_gray_button(self.input_file_frame, text="Browse File", command=self.browse_media_input_file)
         self.input_file_btn.pack(side=tk.RIGHT)
         
         # Output directory
         output_frame = ttk.Frame(io_content)
         output_frame.pack(fill=tk.X, pady=(0, 0))
         
-        ttk.Label(output_frame, text="📁 Output Directory:", style='Info.TLabel').pack(anchor=tk.W)
+        ttk.Label(output_frame, text="Output Directory:", style='Info.TLabel').pack(anchor=tk.W)
         output_entry = ttk.Entry(output_frame, textvariable=self.media_output_dir_var, width=60, font=('Segoe UI', 10))
         output_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
         
-        output_browse_btn = WindowManager.create_gray_button(output_frame, text="📁 Browse", command=self.browse_media_output_directory)
+        output_browse_btn = WindowManager.create_gray_button(output_frame, text="Browse", command=self.browse_media_output_directory)
         output_browse_btn.pack(side=tk.RIGHT)
 
         # Initial visibility - set up widget references
@@ -166,142 +187,164 @@ class MediaConverterPage:
         # Defer simple mode activation until all sections are created
         
         # Media Type Selection Card - Modern Windows 11 style
-        type_card, type_content = WindowManager.create_modern_section(scrollable_frame, "🎯 Media Type")
+        type_card, type_content = WindowManager.create_modern_section(scrollable_frame, "Media Type")
         type_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
-        ttk.Radiobutton(type_content, text="🎵 Audio Files", variable=self.media_type_var, value="audio", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 8))
-        ttk.Radiobutton(type_content, text="🖼️ Image Files", variable=self.media_type_var, value="image", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 8))
-        ttk.Radiobutton(type_content, text="🎬 Video Files", variable=self.media_type_var, value="video", command=self.update_format_options).pack(anchor=tk.W, pady=(0, 0))
+        self.media_type_segment = WindowManager.create_segmented_control(
+            type_content,
+            self.media_type_var,
+            [
+                ("Audio", "audio"),
+                ("Image", "image"),
+                ("Video", "video"),
+            ],
+            command=self.update_format_options,
+        )
+        self.media_type_segment.pack(anchor=tk.W)
         
         # Format Selection Card - Modern Windows 11 style
-        self.format_card, format_content = WindowManager.create_modern_section(scrollable_frame, "📋 Format Selection")
+        self.format_card, format_content = WindowManager.create_modern_section(scrollable_frame, "Format")
         self.format_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
-        # Input format
-        input_format_frame = ttk.Frame(format_content)
-        input_format_frame.pack(fill=tk.X, pady=(0, 15))
+        format_row = ttk.Frame(format_content)
+        format_row.pack(fill=tk.X)
+
+        from_format_frame = ttk.Frame(format_row)
+        from_format_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        ttk.Label(input_format_frame, text="📥 Input Format:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        self.input_format_combo = ttk.Combobox(input_format_frame, textvariable=self.input_format_var, state="readonly", font=('Segoe UI', 10))
+        ttk.Label(from_format_frame, text="From:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        self.input_format_combo = ttk.Combobox(from_format_frame, textvariable=self.input_format_var, state="readonly", font=('Segoe UI', 10))
         self.input_format_combo.pack(fill=tk.X, pady=(0, 0))
         self.input_format_combo.bind('<<ComboboxSelected>>', self.on_input_format_change)
+
+        ttk.Label(format_row, text="->", style='Info.TLabel').pack(side=tk.LEFT, padx=14, pady=(20, 0))
         
         # Output format
-        output_format_frame = ttk.Frame(format_content)
-        output_format_frame.pack(fill=tk.X, pady=(0, 0))
+        output_format_frame = ttk.Frame(format_row)
+        output_format_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        ttk.Label(output_format_frame, text="📤 Output Format:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Label(output_format_frame, text="To:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
         self.output_format_combo = ttk.Combobox(output_format_frame, textvariable=self.output_format_var, state="readonly", font=('Segoe UI', 10))
         self.output_format_combo.pack(fill=tk.X, pady=(0, 0))
         
-        # Quality Settings Card - Modern Windows 11 style
-        self.quality_card, quality_content = WindowManager.create_modern_section(scrollable_frame, "⚙️ Quality Settings")
+        # Quality and advanced settings are collapsible to keep the main path compact.
+        self.quality_card, quality_content = WindowManager.create_collapsible_section(scrollable_frame, "Quality", expanded=True)
         self.quality_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Audio quality settings
         self.audio_quality_frame = ttk.Frame(quality_content)
         self.audio_quality_frame.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(self.audio_quality_frame, text="🎵 Audio Quality:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_quality_frame, text="🎯 Source Quality (Keep Original)", variable=self.audio_quality_var, value="source").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_quality_frame, text="🎵 High Quality (320 kbps)", variable=self.audio_quality_var, value="high").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_quality_frame, text="📱 Standard Quality (192 kbps)", variable=self.audio_quality_var, value="standard").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_quality_frame, text="💾 Low Quality (128 kbps)", variable=self.audio_quality_var, value="low").pack(anchor=tk.W, pady=(0, 0))
+        ttk.Label(self.audio_quality_frame, text="Audio Quality:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_quality_frame, text="Source Quality (keep original)", variable=self.audio_quality_var, value="source").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_quality_frame, text="High Quality (320 kbps)", variable=self.audio_quality_var, value="high").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_quality_frame, text="Standard Quality (192 kbps)", variable=self.audio_quality_var, value="standard").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_quality_frame, text="Low Quality (128 kbps)", variable=self.audio_quality_var, value="low").pack(anchor=tk.W, pady=(0, 0))
         
         # Video quality settings
         self.video_quality_frame = ttk.Frame(quality_content)
         self.video_quality_frame.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(self.video_quality_frame, text="🎬 Video Quality:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="🎯 Source Resolution (Keep Original)", variable=self.video_quality_var, value="source").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="🎬 8K Ultra (7680x4320)", variable=self.video_quality_var, value="8k").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="🎬 4K Ultra (3840x2160)", variable=self.video_quality_var, value="4k").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="🎬 High Quality (1080p)", variable=self.video_quality_var, value="high").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="📱 Standard Quality (720p)", variable=self.video_quality_var, value="standard").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="💾 Low Quality (480p)", variable=self.video_quality_var, value="low").pack(anchor=tk.W, pady=(0, 15))
+        ttk.Label(self.video_quality_frame, text="Video Resolution:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="Source Resolution (keep original)", variable=self.video_quality_var, value="source").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="8K Ultra (7680x4320)", variable=self.video_quality_var, value="8k").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="4K Ultra (3840x2160)", variable=self.video_quality_var, value="4k").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="High Quality (1080p)", variable=self.video_quality_var, value="high").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="Standard Quality (720p)", variable=self.video_quality_var, value="standard").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="Low Quality (480p)", variable=self.video_quality_var, value="low").pack(anchor=tk.W, pady=(0, 15))
         
         # Framerate settings
-        ttk.Label(self.video_quality_frame, text="🎞️ Framerate:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="🎯 Source Framerate (Keep Original)", variable=self.framerate_var, value="source").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="🎬 60 FPS (Smooth)", variable=self.framerate_var, value="60").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="🎬 30 FPS (Standard)", variable=self.framerate_var, value="30").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_quality_frame, text="🎬 24 FPS (Cinematic)", variable=self.framerate_var, value="24").pack(anchor=tk.W, pady=(0, 0))
+        ttk.Label(self.video_quality_frame, text="Framerate:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="Source Framerate (keep original)", variable=self.framerate_var, value="source").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="60 FPS (smooth)", variable=self.framerate_var, value="60").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="30 FPS (standard)", variable=self.framerate_var, value="30").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_quality_frame, text="24 FPS (cinematic)", variable=self.framerate_var, value="24").pack(anchor=tk.W, pady=(0, 0))
         
         # Image quality settings
         self.image_quality_frame = ttk.Frame(quality_content)
         self.image_quality_frame.pack(fill=tk.X, pady=(0, 0))
         
-        ttk.Label(self.image_quality_frame, text="🖼️ Image Quality:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.image_quality_frame, text="🎯 Source Quality (Keep Original)", variable=self.image_quality_var, value="source").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.image_quality_frame, text="🖼️ High Quality (95%)", variable=self.image_quality_var, value="high").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.image_quality_frame, text="📱 Standard Quality (80%)", variable=self.image_quality_var, value="standard").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.image_quality_frame, text="💾 Low Quality (60%)", variable=self.image_quality_var, value="low").pack(anchor=tk.W, pady=(0, 0))
+        ttk.Label(self.image_quality_frame, text="Image Quality:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.image_quality_frame, text="Source Quality (keep original)", variable=self.image_quality_var, value="source").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.image_quality_frame, text="High Quality (95%)", variable=self.image_quality_var, value="high").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.image_quality_frame, text="Standard Quality (80%)", variable=self.image_quality_var, value="standard").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.image_quality_frame, text="Low Quality (60%)", variable=self.image_quality_var, value="low").pack(anchor=tk.W, pady=(0, 0))
         
-        # Advanced Options Card - Modern Windows 11 style
-        self.advanced_card, advanced_content = WindowManager.create_modern_section(scrollable_frame, "🔧 Advanced Options")
-        self.advanced_card.pack(fill=tk.X, pady=(0, 24), padx=0)
+        self.encoding_card, encoding_content = WindowManager.create_collapsible_section(scrollable_frame, "Encoding", expanded=True)
+        self.encoding_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Video encoding options
-        self.video_encoding_frame = ttk.Frame(advanced_content)
+        self.video_encoding_frame = ttk.Frame(encoding_content)
         self.video_encoding_frame.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(self.video_encoding_frame, text="🎬 Video Encoding:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_encoding_frame, text="📹 H.264 (Compatible)", variable=self.video_codec_var, value="h264").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_encoding_frame, text="📹 H.265 (Efficient)", variable=self.video_codec_var, value="h265").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.video_encoding_frame, text="📹 VP9 (Web Optimized)", variable=self.video_codec_var, value="vp9").pack(anchor=tk.W, pady=(0, 0))
+        ttk.Label(self.video_encoding_frame, text="Video Codec:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_encoding_frame, text="H.264 (compatible)", variable=self.video_codec_var, value="h264").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_encoding_frame, text="H.265 (efficient)", variable=self.video_codec_var, value="h265").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.video_encoding_frame, text="VP9 (web optimized)", variable=self.video_codec_var, value="vp9").pack(anchor=tk.W, pady=(0, 0))
         
         # Audio encoding options
-        self.audio_encoding_frame = ttk.Frame(advanced_content)
+        self.audio_encoding_frame = ttk.Frame(encoding_content)
         self.audio_encoding_frame.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(self.audio_encoding_frame, text="🎵 Audio Encoding:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_encoding_frame, text="🎵 AAC (Compatible)", variable=self.audio_codec_var, value="aac").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_encoding_frame, text="🎵 MP3 (Universal)", variable=self.audio_codec_var, value="mp3").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_encoding_frame, text="🎵 Opus (Efficient)", variable=self.audio_codec_var, value="opus").pack(anchor=tk.W, pady=(0, 15))
+        ttk.Label(self.audio_encoding_frame, text="Audio Codec:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_encoding_frame, text="AAC (compatible)", variable=self.audio_codec_var, value="aac").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_encoding_frame, text="MP3 (universal)", variable=self.audio_codec_var, value="mp3").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_encoding_frame, text="Opus (efficient)", variable=self.audio_codec_var, value="opus").pack(anchor=tk.W, pady=(0, 0))
+
+        self.streams_card, streams_content = WindowManager.create_collapsible_section(scrollable_frame, "Streams", expanded=False)
+        self.streams_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Multiple audio stream handling
-        ttk.Label(self.audio_encoding_frame, text="🎵 Multiple Audio Streams:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_encoding_frame, text="🎵 Use First Stream Only", variable=self.audio_stream_var, value="first").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_encoding_frame, text="🎵 Use All Streams (Separate Files)", variable=self.audio_stream_var, value="all").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_encoding_frame, text="🎵 Use Best Quality Stream", variable=self.audio_stream_var, value="best").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.audio_encoding_frame, text="🎵 Mix All Streams", variable=self.audio_stream_var, value="mix").pack(anchor=tk.W, pady=(0, 0))
+        self.audio_stream_frame = ttk.Frame(streams_content)
+        self.audio_stream_frame.pack(fill=tk.X)
+        ttk.Label(self.audio_stream_frame, text="Multiple Audio Streams:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_stream_frame, text="Use first stream only", variable=self.audio_stream_var, value="first").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_stream_frame, text="Use all streams (separate files)", variable=self.audio_stream_var, value="all").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_stream_frame, text="Use best quality stream", variable=self.audio_stream_var, value="best").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.audio_stream_frame, text="Mix all streams", variable=self.audio_stream_var, value="mix").pack(anchor=tk.W, pady=(0, 0))
+
+        self.subtitle_card, subtitle_content = WindowManager.create_collapsible_section(scrollable_frame, "Subtitles", expanded=False)
+        self.subtitle_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Subtitle options
-        self.subtitle_frame = ttk.Frame(advanced_content)
+        self.subtitle_frame = ttk.Frame(subtitle_content)
         self.subtitle_frame.pack(fill=tk.X, pady=(0, 15))
         
         self.subtitle_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self.subtitle_frame, text="📝 Include Subtitles", variable=self.subtitle_var).pack(anchor=tk.W, pady=(0, 5))
+        ttk.Checkbutton(self.subtitle_frame, text="Include subtitles", variable=self.subtitle_var).pack(anchor=tk.W, pady=(0, 5))
         
         # Subtitle format selection with tooltips
         subtitle_format_frame = ttk.Frame(self.subtitle_frame)
         subtitle_format_frame.pack(fill=tk.X, pady=(0, 5))
         
-        srt_radio = ttk.Radiobutton(subtitle_format_frame, text="📝 SRT Format", variable=self.subtitle_format_var, value="srt")
+        srt_radio = ttk.Radiobutton(subtitle_format_frame, text="SRT Format", variable=self.subtitle_format_var, value="srt")
         srt_radio.pack(anchor=tk.W, pady=(0, 5))
         TooltipManager.create_tooltip(srt_radio, "SRT: Simple text-based format with timestamps. Compatible with most players and editing software.")
         
-        vtt_radio = ttk.Radiobutton(subtitle_format_frame, text="📝 VTT Format", variable=self.subtitle_format_var, value="vtt")
+        vtt_radio = ttk.Radiobutton(subtitle_format_frame, text="VTT Format", variable=self.subtitle_format_var, value="vtt")
         vtt_radio.pack(anchor=tk.W, pady=(0, 5))
         TooltipManager.create_tooltip(vtt_radio, "VTT: WebVTT format with HTML-like styling. Better for web players and modern applications.")
         
         # Multiple subtitle stream handling
-        ttk.Label(self.subtitle_frame, text="📝 Multiple Subtitle Streams:", style='Info.TLabel').pack(anchor=tk.W, pady=(10, 5))
-        ttk.Radiobutton(self.subtitle_frame, text="📝 Use First Stream Only", variable=self.subtitle_stream_var, value="first").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.subtitle_frame, text="📝 Use All Streams (Separate Files)", variable=self.subtitle_stream_var, value="all").pack(anchor=tk.W, pady=(0, 5))
-        ttk.Radiobutton(self.subtitle_frame, text="📝 Use Best Quality Stream", variable=self.subtitle_stream_var, value="best").pack(anchor=tk.W, pady=(0, 0))
+        ttk.Label(self.subtitle_frame, text="Multiple Subtitle Streams:", style='Info.TLabel').pack(anchor=tk.W, pady=(10, 5))
+        ttk.Radiobutton(self.subtitle_frame, text="Use first stream only", variable=self.subtitle_stream_var, value="first").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.subtitle_frame, text="Use all streams (separate files)", variable=self.subtitle_stream_var, value="all").pack(anchor=tk.W, pady=(0, 5))
+        ttk.Radiobutton(self.subtitle_frame, text="Use best quality stream", variable=self.subtitle_stream_var, value="best").pack(anchor=tk.W, pady=(0, 0))
+
+        self.metadata_gpu_card, metadata_gpu_content = WindowManager.create_collapsible_section(scrollable_frame, "Metadata and GPU", expanded=True)
+        self.metadata_gpu_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Shared metadata option
-        self.metadata_frame = ttk.Frame(advanced_content)
+        self.metadata_frame = ttk.Frame(metadata_gpu_content)
         self.metadata_frame.pack(fill=tk.X, pady=(0, 0))
         
-        ttk.Checkbutton(self.metadata_frame, text="🏷️ Share metadata between audio and video", variable=self.shared_metadata_var).pack(anchor=tk.W, pady=(0, 15))
+        ttk.Checkbutton(self.metadata_frame, text="Share metadata between audio and video", variable=self.shared_metadata_var).pack(anchor=tk.W, pady=(0, 15))
         
         # GPU acceleration settings
-        self.gpu_frame = ttk.Frame(advanced_content)
+        self.gpu_frame = ttk.Frame(metadata_gpu_content)
         self.gpu_frame.pack(fill=tk.X, pady=(0, 0))
         
-        ttk.Label(self.gpu_frame, text="🎮 GPU Acceleration:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        ttk.Label(self.gpu_frame, text="GPU Acceleration:", style='Info.TLabel').pack(anchor=tk.W, pady=(0, 5))
         
         # GPU status display
         gpu_status = self.get_gpu_status_text()
@@ -309,7 +352,7 @@ class MediaConverterPage:
         self.gpu_status_label.pack(anchor=tk.W, pady=(0, 10))
         
         # GPU options
-        gpu_checkbox = ttk.Checkbutton(self.gpu_frame, text="🚀 Use GPU acceleration (if available)", variable=self.use_gpu_var, command=self.update_gpu_selection_visibility)
+        gpu_checkbox = ttk.Checkbutton(self.gpu_frame, text="Use GPU acceleration (if available)", variable=self.use_gpu_var, command=self.update_gpu_selection_visibility)
         gpu_checkbox.pack(anchor=tk.W, pady=(0, 5))
         TooltipManager.create_tooltip(gpu_checkbox, "Enable GPU acceleration for faster video encoding. Automatically detects and uses NVIDIA, AMD, Intel, or Apple GPU encoders.")
         
@@ -317,24 +360,31 @@ class MediaConverterPage:
         gpu_selection_frame = ttk.Frame(self.gpu_frame)
         gpu_selection_frame.pack(fill=tk.X, pady=(0, 5))
         
-        ttk.Label(gpu_selection_frame, text="🎯 GPU Selection:", style='Info.TLabel').pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(gpu_selection_frame, text="GPU Selection:", style='Info.TLabel').pack(side=tk.LEFT, padx=(0, 10))
         self.gpu_combo = ttk.Combobox(gpu_selection_frame, textvariable=self.selected_gpu_var, state="readonly", width=20)
         self.gpu_combo.pack(side=tk.LEFT)
         self.update_gpu_selection_options()
         
-        cpu_checkbox = ttk.Checkbutton(self.gpu_frame, text="💻 Force CPU encoding", variable=self.force_cpu_var, command=self.update_gpu_selection_visibility)
+        cpu_checkbox = ttk.Checkbutton(self.gpu_frame, text="Force CPU encoding", variable=self.force_cpu_var, command=self.update_gpu_selection_visibility)
         cpu_checkbox.pack(anchor=tk.W, pady=(0, 0))
         TooltipManager.create_tooltip(cpu_checkbox, "Force CPU encoding even if GPU is available. Useful for maximum quality or compatibility.")
         
-        # Action Card - Modern Windows 11 style
-        action_card, action_content = WindowManager.create_modern_section(scrollable_frame, "🚀 Actions")
-        action_card.pack(fill=tk.X, pady=(0, 24), padx=0)
+        footer = tk.Frame(page, bg='#252525', highlightthickness=1, highlightbackground='#3D3D3D')
+        footer.pack(side=tk.BOTTOM, fill=tk.X, pady=(12, 0))
+        status_label = tk.Label(
+            footer,
+            textvariable=self.job_status_var,
+            font=('Segoe UI', 10),
+            bg='#252525',
+            fg='#C0C0C0',
+            anchor='w',
+        )
+        status_label.pack(side=tk.LEFT, padx=14, pady=10, fill=tk.X, expand=True)
+        self.media_convert_start_btn = WindowManager.create_gray_button(footer, text="Start Conversion", command=self.start_media_conversion)
+        self.media_convert_start_btn.pack(side=tk.RIGHT, padx=(8, 14), pady=8)
         
-        self.media_convert_start_btn = WindowManager.create_gray_button(action_content, text="🚀 Start Conversion", command=self.start_media_conversion)
-        self.media_convert_start_btn.pack(side=tk.LEFT, padx=(0, 15))
-        
-        self.media_convert_stop_btn = WindowManager.create_gray_button(action_content, text="⏹️ Stop", command=self.stop_media_conversion, state=tk.DISABLED)
-        self.media_convert_stop_btn.pack(side=tk.LEFT)
+        self.media_convert_stop_btn = WindowManager.create_gray_button(footer, text="Stop", command=self.stop_media_conversion, state=tk.DISABLED)
+        self.media_convert_stop_btn.pack(side=tk.RIGHT, pady=8)
         
         # Pack canvas and scrollbar
         canvas.pack(side="left", fill="both", expand=True)
@@ -377,9 +427,9 @@ class MediaConverterPage:
             available_gpus.append("Apple")
         
         if available_gpus:
-            return f"✅ GPU acceleration available: {', '.join(available_gpus)}"
+            return f"GPU acceleration available: {', '.join(available_gpus)}"
         else:
-            return "❌ No GPU acceleration detected - using CPU encoding"
+            return "No GPU acceleration detected - using CPU encoding"
     
     def update_gpu_selection_options(self):
         """Update GPU selection dropdown options"""
@@ -411,7 +461,10 @@ class MediaConverterPage:
         if is_simple:
             # Hide advanced sections
             self.quality_card.pack_forget()
-            self.advanced_card.pack_forget()
+            self.encoding_card.pack_forget()
+            self.streams_card.pack_forget()
+            self.subtitle_card.pack_forget()
+            self.metadata_gpu_card.pack_forget()
             
             # Show simple mode status
             self.simple_mode_status.pack(side=tk.LEFT, padx=(20, 0))
@@ -432,9 +485,8 @@ class MediaConverterPage:
             # Hide simple mode status
             self.simple_mode_status.pack_forget()
             
-            # Show advanced sections
-            self.quality_card.pack(fill=tk.X, pady=(0, 24), padx=0)
-            self.advanced_card.pack(fill=tk.X, pady=(0, 24), padx=0)
+            # Show advanced sections for the current media type.
+            self.update_quality_visibility()
     
     def browse_media_input_directory(self):
         """Browse for media input directory"""
@@ -471,6 +523,8 @@ class MediaConverterPage:
     def update_format_options(self):
         """Update format options based on selected media type"""
         media_type = self.media_type_var.get()
+        if hasattr(self, 'media_type_segment'):
+            self.media_type_segment.refresh()
         
         # Define format options for each media type
         format_options = {
@@ -549,6 +603,16 @@ class MediaConverterPage:
     def update_quality_visibility(self):
         """Update visibility of quality settings based on media type"""
         media_type = self.media_type_var.get()
+
+        if self.simple_mode_var.get():
+            self.quality_card.pack_forget()
+            self.encoding_card.pack_forget()
+            self.streams_card.pack_forget()
+            self.subtitle_card.pack_forget()
+            self.metadata_gpu_card.pack_forget()
+            return
+
+        self.quality_card.pack(fill=tk.X, pady=(0, 24), padx=0)
         
         # Show/hide quality frames based on media type
         if media_type == "audio":
@@ -570,27 +634,42 @@ class MediaConverterPage:
     def update_advanced_visibility(self):
         """Update visibility of advanced options based on media type"""
         media_type = self.media_type_var.get()
+
+        for card in (self.encoding_card, self.streams_card, self.subtitle_card, self.metadata_gpu_card):
+            card.pack_forget()
         
         if media_type == "audio":
             # Show only audio encoding options
+            self.encoding_card.pack(fill=tk.X, pady=(0, 24), padx=0)
+            self.metadata_gpu_card.pack(fill=tk.X, pady=(0, 24), padx=0)
             self.audio_encoding_frame.pack(fill=tk.X, pady=(0, 15))
             self.video_encoding_frame.pack_forget()
+            self.audio_stream_frame.pack_forget()
             self.subtitle_frame.pack_forget()
             self.metadata_frame.pack(fill=tk.X, pady=(0, 0))
+            self.gpu_frame.pack_forget()
             
         elif media_type == "video":
             # Show video encoding, audio encoding, subtitles, and metadata options
+            self.encoding_card.pack(fill=tk.X, pady=(0, 24), padx=0)
+            self.streams_card.pack(fill=tk.X, pady=(0, 24), padx=0)
+            self.subtitle_card.pack(fill=tk.X, pady=(0, 24), padx=0)
+            self.metadata_gpu_card.pack(fill=tk.X, pady=(0, 24), padx=0)
             self.video_encoding_frame.pack(fill=tk.X, pady=(0, 15))
             self.audio_encoding_frame.pack(fill=tk.X, pady=(0, 15))
+            self.audio_stream_frame.pack(fill=tk.X)
             self.subtitle_frame.pack(fill=tk.X, pady=(0, 15))
             self.metadata_frame.pack(fill=tk.X, pady=(0, 0))
+            self.gpu_frame.pack(fill=tk.X, pady=(0, 0))
             
         elif media_type == "image":
             # Hide all advanced options for images (they don't need encoding/subtitle options)
             self.video_encoding_frame.pack_forget()
             self.audio_encoding_frame.pack_forget()
+            self.audio_stream_frame.pack_forget()
             self.subtitle_frame.pack_forget()
             self.metadata_frame.pack_forget()
+            self.gpu_frame.pack_forget()
     
     def start_media_conversion(self):
         """Start media conversion process"""
@@ -620,6 +699,8 @@ class MediaConverterPage:
         # Update button states
         self.media_convert_start_btn.configure(state=tk.DISABLED)
         self.media_convert_stop_btn.configure(state=tk.NORMAL)
+        self.job_status_var.set("Running conversion...")
+        self.media_cancel_event = threading.Event()
         
         # Start conversion in a separate thread
         self.media_conversion_thread = threading.Thread(target=self.run_media_conversion)
@@ -640,6 +721,8 @@ class MediaConverterPage:
             self.log_callback(f"Starting {media_type} conversion from {input_format} to {output_format}", "INFO")
             
             # Build conversion parameters
+            summary = None
+
             if media_type == "audio":
                 if mode == "single":
                     from os.path import dirname
@@ -647,18 +730,20 @@ class MediaConverterPage:
                         output_dir = dirname(input_file)
                     # For single file conversion, let the converter determine the appropriate codec
                     # based on the output format rather than using the GUI codec selection
-                    self.converter.convert_single_audio_file(
+                    summary = self.converter.convert_single_audio_file(
                         input_file, output_dir, output_format,
                         quality=self.audio_quality_var.get(),
                         audio_codec=None,  # Let the method determine the correct codec
-                        preserve_metadata=self.shared_metadata_var.get()
+                        preserve_metadata=self.shared_metadata_var.get(),
+                        cancel_event=self.media_cancel_event
                     )
                 else:
-                    self.converter.convert_audio_files(
+                    summary = self.converter.convert_audio_files(
                         input_dir, output_dir, input_format, output_format,
                         quality=self.audio_quality_var.get(),
                         audio_codec=self.audio_codec_var.get(),
-                        preserve_metadata=self.shared_metadata_var.get()
+                        preserve_metadata=self.shared_metadata_var.get(),
+                        cancel_event=self.media_cancel_event
                     )
             elif media_type == "video":
                 if mode == "single":
@@ -672,7 +757,7 @@ class MediaConverterPage:
                         if gpu_selection and gpu_selection != "auto (Auto-select best GPU)":
                             selected_gpu = gpu_selection.split(" ")[0]  # Extract GPU type
                     
-                    self.converter.convert_single_video_file(
+                    summary = self.converter.convert_single_video_file(
                         input_file, output_dir, output_format,
                         quality=self.video_quality_var.get(),
                         framerate=self.framerate_var.get(),
@@ -681,7 +766,8 @@ class MediaConverterPage:
                         preserve_metadata=self.shared_metadata_var.get(),
                         use_gpu=self.use_gpu_var.get(),
                         force_cpu=self.force_cpu_var.get(),
-                        selected_gpu=selected_gpu
+                        selected_gpu=selected_gpu,
+                        cancel_event=self.media_cancel_event
                     )
                 else:
                     # Get selected GPU
@@ -691,7 +777,7 @@ class MediaConverterPage:
                         if gpu_selection and gpu_selection != "auto (Auto-select best GPU)":
                             selected_gpu = gpu_selection.split(" ")[0]  # Extract GPU type
                     
-                    self.converter.convert_video_files(
+                    summary = self.converter.convert_video_files(
                         input_dir, output_dir, input_format, output_format,
                         quality=self.video_quality_var.get(),
                         framerate=self.framerate_var.get(),
@@ -704,24 +790,27 @@ class MediaConverterPage:
                         preserve_metadata=self.shared_metadata_var.get(),
                         use_gpu=self.use_gpu_var.get(),
                         force_cpu=self.force_cpu_var.get(),
-                        selected_gpu=selected_gpu
+                        selected_gpu=selected_gpu,
+                        cancel_event=self.media_cancel_event
                     )
             elif media_type == "image":
                 if mode == "single":
                     from os.path import dirname
                     if not output_dir:
                         output_dir = dirname(input_file)
-                    self.converter.convert_single_image_file(
+                    summary = self.converter.convert_single_image_file(
                         input_file, output_dir, output_format,
-                        quality=self.image_quality_var.get()
+                        quality=self.image_quality_var.get(),
+                        cancel_event=self.media_cancel_event
                     )
                 else:
-                    self.converter.convert_image_files(
+                    summary = self.converter.convert_image_files(
                         input_dir, output_dir, input_format, output_format,
-                        quality=self.image_quality_var.get()
+                        quality=self.image_quality_var.get(),
+                        cancel_event=self.media_cancel_event
                     )
             
-            self.log_callback("Media conversion completed successfully", "SUCCESS")
+            self._log_media_conversion_completion(summary)
             
         except Exception as e:
             self.log_callback(f"Media conversion failed: {str(e)}", "ERROR")
@@ -734,7 +823,32 @@ class MediaConverterPage:
         """Stop media conversion process"""
         if hasattr(self, 'media_conversion_thread') and self.media_conversion_thread.is_alive():
             self.log_callback("Media conversion stop requested", "WARNING")
-        
-        # Update button states
-        self.media_convert_start_btn.configure(state=tk.NORMAL)
-        self.media_convert_stop_btn.configure(state=tk.DISABLED)
+            self.job_status_var.set("Stop requested...")
+            self.media_cancel_event.set()
+            self.converter.stop_active_process()
+            self.media_convert_stop_btn.configure(state=tk.DISABLED)
+
+    def _log_media_conversion_completion(self, summary):
+        """Log final conversion status using converter outcome counters."""
+        if not summary:
+            self.log_callback("Media conversion completed successfully", "SUCCESS")
+            self.job_status_var.set("Completed")
+            return
+
+        if summary.get("cancelled"):
+            self.job_status_var.set("Cancelled")
+            self.log_callback(
+                f"Media conversion cancelled ({summary.get('success', 0)} succeeded, "
+                f"{summary.get('failed', 0)} failed)",
+                "WARNING",
+            )
+        elif summary.get("failed"):
+            self.job_status_var.set("Completed with failures")
+            self.log_callback(
+                f"Media conversion completed with {summary['failed']} failure(s) "
+                f"and {summary.get('success', 0)} success(es)",
+                "WARNING",
+            )
+        else:
+            self.job_status_var.set("Completed")
+            self.log_callback("Media conversion completed successfully", "SUCCESS")

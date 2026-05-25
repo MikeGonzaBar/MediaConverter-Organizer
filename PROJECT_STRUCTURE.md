@@ -1,62 +1,103 @@
 # Project Structure
 
-This document describes the organized folder structure of the Media Converter & Organizer project.
+This project keeps executable entry points in the root and support scripts in `scripts/`, while all application logic lives under the `src` package.
 
-## 📁 Folder Organization
-
-```
+```text
 MediaConverter-Organizer/
-├── src/              # All Python source code
-├── scripts/          # Launcher and setup scripts
-├── docs/             # Documentation files
-├── assets/           # Images, icons, and other assets
-└── [root files]      # Configuration and entry points
+|-- main.py
+|-- requirements.txt
+|-- README.md
+|-- PROJECT_STRUCTURE.md
+|-- LICENSE
+|-- assets/
+|   |-- LogoIcon.ico
+|   `-- LogoIcon.png
+|-- docs/
+|   |-- LASTFM_SETUP.md
+|   `-- TESTING.md
+|-- scripts/
+|   |-- fix_pip_corruption.bat
+|   |-- fix_pip_corruption.sh
+|   |-- run_gui.bat
+|   |-- run_gui.py
+|   |-- run_gui.sh
+|   |-- setup.bat
+|   `-- setup.sh
+|-- src/
+|   |-- __init__.py
+|   |-- dependency_checker.py
+|   |-- gui_utils.py
+|   |-- image_organizer.py
+|   |-- media_converter.py
+|   |-- media_converter_organizer_gui.py
+|   |-- media_converter_page.py
+|   |-- ui_components.py
+|   |-- video_organizer.py
+|   `-- wav_to_flac_converter.py
+`-- tests/
+    |-- __init__.py
+    |-- test_dependency_checker.py
+    |-- test_integration_smoke.py
+    |-- test_media_converter.py
+    |-- test_organizers.py
+    `-- test_wav_metadata.py
 ```
 
-## 📂 Directory Details
+## Directories
 
-### `src/` - Source Code
+`src/` contains the application package:
 
-Contains all Python modules:
+- `media_converter.py`: audio, video, and image conversion logic.
+- `image_organizer.py`: image date extraction and organization.
+- `video_organizer.py`: video metadata extraction and organization.
+- `wav_to_flac_converter.py`: WAV-to-FLAC conversion and metadata enhancement.
+- `media_converter_organizer_gui.py`: main Tk application.
+- `media_converter_page.py`: converter page widgets and workflow wiring.
+- `ui_components.py`: reusable organizer and WAV page components.
+- `gui_utils.py`: styling, icons, window helpers, and shared UI utilities.
+- `dependency_checker.py`: optional and required dependency checks.
 
-- **Core modules**: `media_converter.py`, `image_organizer.py`, `video_organizer.py`, `wav_to_flac_converter.py`
-- **GUI modules**: `media_converter_organizer_gui.py`, `media_converter_page.py`, `ui_components.py`, `gui_utils.py`
-- **Utilities**: `dependency_checker.py`
-- **Package file**: `__init__.py` (makes src a Python package)
+`scripts/` contains setup and launch helpers:
 
-### `scripts/` - Launcher Scripts
+- `run_gui.py`: cross-platform launcher that can create `.venv`, install requirements, check external tools, and run the GUI.
+- `setup.bat` / `setup.sh`: platform setup scripts.
+- `run_gui.bat` / `run_gui.sh`: platform launch scripts.
+- `fix_pip_corruption.bat` / `fix_pip_corruption.sh`: cleanup helpers for broken local pip metadata.
 
-Contains all launcher and setup scripts:
+`docs/` contains task-specific documentation:
 
-- **Cross-platform**: `run_gui.py` (works on Windows, Linux, macOS)
-- **Windows**: `setup.bat`, `run_gui.bat`
-- **Linux/macOS**: `setup.sh`, `run_gui.sh`
+- `TESTING.md`: test, compile, diff, smoke, visual, and security audit checks.
+- `LASTFM_SETUP.md`: Last.fm API setup for metadata lookup.
 
-### `docs/` - Documentation
+`assets/` contains application branding:
 
-Contains additional documentation:
+- `LogoIcon.png`: logo used inside the GUI.
+- `LogoIcon.ico`: Windows icon used by the window and taskbar.
 
-- `CROSS_PLATFORM_SETUP.md` - Cross-platform setup guide
-- `TESTING.md` - Testing documentation
-- `LASTFM_SETUP.md` - Last.fm API setup guide
+## Running
 
-### `assets/` - Assets
+Use one of these commands from the project root:
 
-Contains images and icons:
+```bash
+python main.py
+python scripts/run_gui.py
+```
 
-- `LogoIcon.png` - Application logo (PNG format)
-- `LogoIcon.ico` - Application icon (ICO format, auto-generated)
+Windows:
 
-### Root Files
+```cmd
+scripts\run_gui.bat
+```
 
-- `README.md` - Main documentation (stays in root per convention)
-- `requirements.txt` - Python dependencies (stays in root per convention)
-- `LICENSE` - Project license
-- `main.py` - Main entry point for the application
+Linux/macOS:
 
-## 🔄 Import Structure
+```bash
+./scripts/run_gui.sh
+```
 
-All imports use the `src.` prefix:
+## Import Pattern
+
+Application code imports through the `src` package:
 
 ```python
 from src.media_converter import MediaConverter
@@ -64,28 +105,4 @@ from src.gui_utils import WindowManager
 from src.ui_components import MediaOrganizerPage
 ```
 
-## 🚀 Running the Application
-
-### Option 1: Main Entry Point (Recommended)
-
-```bash
-python main.py
-```
-
-### Option 2: Cross-Platform Launcher
-
-```bash
-python scripts/run_gui.py
-```
-
-### Option 3: Platform-Specific Scripts
-
-- **Windows**: `scripts\run_gui.bat`
-- **Linux/macOS**: `./scripts/run_gui.sh`
-
-## 📝 Notes
-
-- The `src/` folder is a Python package (contains `__init__.py`)
-- Asset paths are resolved relative to the project root
-- All scripts assume they're run from the project root directory
-- The `main.py` file handles path setup automatically
+`main.py` adds the project root and `src/` directory to `sys.path` before launching the GUI.

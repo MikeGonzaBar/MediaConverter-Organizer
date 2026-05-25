@@ -11,7 +11,7 @@ import os
 import sys
 import argparse
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import mimetypes
 import subprocess
@@ -32,6 +32,43 @@ VIDEO_EXTENSIONS = {
     '.ogv', '.ts', '.mts', '.m2ts', '.vob', '.asf', '.rm', '.rmvb', '.divx',
     '.xvid', '.mpg', '.mpeg', '.m2v', '.m4v', '.f4v', '.f4p', '.f4a', '.f4b'
 }
+
+def is_cancelled(cancel_event):
+    """Return True when an optional cancellation event has been requested."""
+    return bool(cancel_event and cancel_event.is_set())
+
+def parse_video_date(date_str):
+    """Parse common video metadata date formats into a naive UTC datetime."""
+    if not date_str:
+        return None
+
+    if isinstance(date_str, bytes):
+        date_str = date_str.decode("utf-8", errors="ignore")
+
+    normalized = str(date_str).strip()
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+    except ValueError:
+        pass
+
+    for fmt in [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y:%m:%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%Y/%m/%d %H:%M:%S"
+    ]:
+        try:
+            return datetime.strptime(str(date_str).strip(), fmt)
+        except ValueError:
+            continue
+
+    return None
 
 def is_video_file(file_path):
     """
@@ -83,25 +120,10 @@ def get_video_metadata(video_path):
         for field in date_fields:
             if field in format_info.get('tags', {}):
                 date_str = format_info['tags'][field]
-                try:
-                    # Try different date formats
-                    for fmt in [
-                        "%Y-%m-%d %H:%M:%S",
-                        "%Y-%m-%dT%H:%M:%S.%fZ",
-                        "%Y-%m-%dT%H:%M:%S",
-                        "%Y:%m:%d %H:%M:%S",
-                        "%Y-%m-%d",
-                        "%Y/%m/%d %H:%M:%S"
-                    ]:
-                        try:
-                            metadata['creation_date'] = datetime.strptime(date_str, fmt)
-                            break
-                        except ValueError:
-                            continue
-                    if 'creation_date' in metadata:
-                        break
-                except Exception:
-                    continue
+                parsed_date = parse_video_date(date_str)
+                if parsed_date:
+                    metadata['creation_date'] = parsed_date
+                    break
         
         # Store other useful metadata
         if 'duration' in format_info:
@@ -206,7 +228,7 @@ def get_expected_path(file_path, source_dir):
     expected_dir = source_dir / str(year) / f"{month:02d}-{month_name}"
     return expected_dir / file_path.name
 
-def move_video_file(file_info, dry_run=False):
+def move_video_file(file_info, dry_run=False, cancel_event=None):
     """
     Move a video file to its organized location.
     
@@ -219,6 +241,10 @@ def move_video_file(file_info, dry_run=False):
     """
     source = file_info['source']
     target = file_info['target']
+
+    if is_cancelled(cancel_event):
+        print(f"  [CANCELLED] Skipping: {source.name}")
+        return False
     
     if dry_run:
         print(f"  [DRY RUN] Would move: {source.name}")
@@ -247,7 +273,7 @@ def move_video_file(file_info, dry_run=False):
         print(f"  [ERROR] Failed to move {source.name}: {e}")
         return False
 
-def scan_and_organize_videos(source_dir, move_files=False, dry_run=False):
+def scan_and_organize_videos(source_dir, move_files=False, dry_run=False, cancel_event=None):
     """
     Scan the source directory recursively for videos and organize them.
     
@@ -284,6 +310,10 @@ def scan_and_organize_videos(source_dir, move_files=False, dry_run=False):
     scanned_files = 0
     
     for file_path in source_dir.rglob('*'):
+        if is_cancelled(cancel_event):
+            print("Operation cancelled while scanning videos.")
+            return
+
         scanned_files += 1
         
         # Show progress every 100 files
@@ -376,7 +406,11 @@ def scan_and_organize_videos(source_dir, move_files=False, dry_run=False):
                     print()
                 else:
                     # Move the file
-                    if move_video_file(file_info, dry_run):
+                    if is_cancelled(cancel_event):
+                        print("Operation cancelled while moving videos.")
+                        return
+
+                    if move_video_file(file_info, dry_run, cancel_event=cancel_event):
                         moved_count += 1
                     else:
                         failed_count += 1
@@ -415,7 +449,7 @@ def scan_and_organize_videos(source_dir, move_files=False, dry_run=False):
 class VideoOrganizer:
     """Class wrapper for video organization functionality"""
     
-    def __init__(self, directory, mode="check", log_callback=None):
+    def __init__(self, directory, mode="check", log_callback=None, cancel_event=None):
         """
         Initialize the VideoOrganizer
         
@@ -427,6 +461,7 @@ class VideoOrganizer:
         self.directory = Path(directory)
         self.mode = mode
         self.log_callback = log_callback or self._default_log
+        self.cancel_event = cancel_event
     
     def _default_log(self, message, level="INFO"):
         """Default logging function that prints to console"""
@@ -480,6 +515,10 @@ class VideoOrganizer:
         scanned_files = 0
         
         for file_path in self.directory.rglob('*'):
+            if is_cancelled(self.cancel_event):
+                self.log_callback("Video organization cancelled while scanning", "WARNING")
+                return
+
             scanned_files += 1
             
             # Show progress every 100 files
@@ -572,7 +611,11 @@ class VideoOrganizer:
                         self.log_callback("", "INFO")
                     else:
                         # Move the file
-                        if move_video_file(file_info, dry_run):
+                        if is_cancelled(self.cancel_event):
+                            self.log_callback("Video organization cancelled while moving", "WARNING")
+                            return
+
+                        if move_video_file(file_info, dry_run, cancel_event=self.cancel_event):
                             moved_count += 1
                         else:
                             failed_count += 1
@@ -616,10 +659,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python video_organizer.py /path/to/videos                    # Check only
-  python video_organizer.py /path/to/videos --dry-run          # Show what would be moved
-  python video_organizer.py /path/to/videos --move             # Actually move files
-  python video_organizer.py "C:\\Users\\Username\\Videos" --move
+  python src/video_organizer.py /path/to/videos                    # Check only
+  python src/video_organizer.py /path/to/videos --dry-run          # Show what would be moved
+  python src/video_organizer.py /path/to/videos --move             # Actually move files
+  python src/video_organizer.py "C:\\Users\\Username\\Videos" --move
 
 Note: Install ffmpeg-python for metadata support: pip install ffmpeg-python
         """
